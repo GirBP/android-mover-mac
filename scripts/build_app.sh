@@ -33,7 +33,7 @@ fi
 # Версія — з git-тега (0.4): CFBundleShortVersionString з останнього тега (без "v"),
 # CFBundleVersion — монотонний лічильник комітів. Правимо ЛИШЕ скопійований plist у dist/,
 # scripts/Info.plist лишається джерелом-шаблоном з дефолтом "0.1.0"/"1".
-VERSION="$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')"
+VERSION="$( (git describe --tags --abbrev=0 2>/dev/null || true) | sed 's/^v//')"
 if [ -z "$VERSION" ]; then
   VERSION="0.0.0"
 fi
