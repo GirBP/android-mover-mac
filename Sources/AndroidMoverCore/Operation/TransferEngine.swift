@@ -1,10 +1,10 @@
 import Foundation
 
 /// Рушій перенесення: рахує → тягне (pull -a) → виставляє дати → верифікує → переміщує в
-/// призначення → (для режиму «перемістити») видаляє з телефона ЛИШЕ після верифікації.
+/// призначення → (для режиму «перемістити») видаляє з телефона лише після верифікації.
 ///
-/// 2.8: клас розбито на 3 файли (жоден не мав перевищувати ~400 рядків), без зміни поведінки:
-/// цей файл — ядро (`transfer`/`transferOne`); TransferEngine+Resume.swift — B2-докачка
+/// Клас розбито на 3 файли, щоб жоден не переростав ~400 рядків: цей файл — ядро
+/// (`transfer`/`transferOne`); TransferEngine+Resume.swift — докачка
 /// (`pullWholeEntry`/`resumeMissing`/`finishAfterPull`/`sleepCancellably`); TransferEngine+
 /// Verify.swift — верифікація/дати/колізії/статичні допоміжні (`verify`/`diff`/`localFileMap`/
 /// `isResumable` тощо). `client`/`fileManager`/`cancellation` — internal (не private): Resume-
@@ -13,26 +13,24 @@ import Foundation
 public final class TransferEngine: @unchecked Sendable {
     let client: ADBClient
     let fileManager = FileManager.default
-    /// 2.2: спільний контролер скасування (SIGTERM→3с→SIGKILL, реєстрація процесу для cancel())
-    /// — раніше тут окремо жили cancelFlag/currentProcess/trackProcess, дубльовані з PushEngine.
+    /// Спільний контролер скасування (SIGTERM→3с→SIGKILL, реєстрація процесу для cancel()).
     let cancellation = CancellationController()
-    /// B2: скільки разів пробувати докачати елемент після обриву pull/провалу verify,
-    /// перш ніж чесно здатись (перша спроба — pull цілого елемента — у це число НЕ входить).
+    /// Скільки разів пробувати докачати елемент після обриву pull/провалу verify, перш ніж
+    /// чесно здатись (перша спроба — pull цілого елемента — у це число не входить).
     let maxAttempts: Int
-    /// B2: пауза між поверненням пристрою (wait-for-device) і докачкою — зростає зі спробою,
+    /// Пауза між поверненням пристрою (wait-for-device) і докачкою — зростає зі спробою,
     /// щоб не бомбити щойно ожилий adb-сервер. Тести підставляють `{ _ in 0 }`.
     let retryDelay: @Sendable (Int) -> TimeInterval
 
-    /// v0.11.0 (P1): коли звіряти md5 з телефоном. Зафіксовано в init; сам прапорець
-    /// «потрібно в ЦІЙ операції» (`checksumRequired`) виставляється на старті transfer(),
-    /// бо залежить від move.
+    /// Коли звіряти md5 з телефоном. Зафіксовано в init; сам прапорець «потрібно в цій
+    /// операції» (`checksumRequired`) виставляється на старті transfer(), бо залежить від move.
     let checksumPolicy: ChecksumPolicy
-    /// Виставляється РАЗ на старті transfer() до будь-якої конкурентності (engine — один на операцію).
+    /// Виставляється раз на старті transfer() до будь-якої конкурентності (engine — один на операцію).
     var checksumRequired = false
 
-    /// v0.11.0 (P6): максимум спроб для ВЕРИФІКАЦІЙНИХ провалів (verify/md5) — 3: якщо
-    /// файл тричі не збігся, справа не в кабелі. Транспортні обриви — до `maxAttempts`
-    /// (за замовчуванням 15 × 120 с очікування ≈ 30 хв).
+    /// Максимум спроб для верифікаційних провалів (verify/md5) — 3: якщо файл тричі не
+    /// збігся, справа не в кабелі. Транспортні обриви — до `maxAttempts` (за замовчуванням
+    /// 15 × 120 с очікування ≈ 30 хв).
     static let verificationAttemptCap = 3
 
     public init(
@@ -91,11 +89,11 @@ public final class TransferEngine: @unchecked Sendable {
             }
         }
 
-        // 2. Місце на диску (з запасом 256 МБ). v0.10.3: `volumeAvailableCapacityForImportantUsage`
-        //    надійний лише на APFS — на exFAT/NTFS/мережевих томах (реальний кейс власника:
-        //    зовнішній exFAT-диск) він повертає 0 чи nil, і перенесення падало ще до старту з
-        //    «вільно 0 B». Тепер — fallback на звичайний volumeAvailableCapacity, а якщо і
-        //    його нема — перевірку пропускаємо (краще спробувати, ніж хибно відмовити).
+        // 2. Місце на диску (з запасом 256 МБ). `volumeAvailableCapacityForImportantUsage`
+        //    надійний лише на APFS — на exFAT/NTFS/мережевих томах він повертає 0 чи nil, і
+        //    перенесення впало б ще до старту з «вільно 0 B». Fallback — на звичайний
+        //    volumeAvailableCapacity, а якщо і його нема — перевірку пропускаємо (краще
+        //    спробувати, ніж хибно відмовити).
         if let available = Self.availableCapacity(at: destination),
            progress.bytesTotal + 256 * 1024 * 1024 > available {
             throw ADBError.notEnoughDiskSpace(needed: progress.bytesTotal, available: available)
@@ -117,8 +115,8 @@ public final class TransferEngine: @unchecked Sendable {
                 index += 1
                 continue
             }
-            // v0.11.0 (P6): диск призначення зник посеред операції (від'єднали зовнішній диск) —
-            // решту елементів чесно провалюємо одразу, без 15 спроб «докачки» в нікуди.
+            // Диск призначення зник посеред операції (від'єднали зовнішній диск) — решту
+            // елементів чесно провалюємо одразу, без 15 спроб «докачки» в нікуди.
             var destinationIsDirectory: ObjCBool = false
             guard fileManager.fileExists(atPath: destination.path, isDirectory: &destinationIsDirectory), destinationIsDirectory.boolValue else {
                 let reason = ADBError.destinationNotWritable(destination.path).localizedDescription
@@ -127,9 +125,9 @@ public final class TransferEngine: @unchecked Sendable {
                 index += 1
                 continue
             }
-            // v0.11.0 (P6): місце під ЦЕЙ елемент перевіряється перед його стартом (диск міг
-            // заповнитись іншими програмами після стартової перевірки) — краще чесна відмова
-            // до копіювання, ніж ENOSPC посеред файла і марні спроби докачки.
+            // Місце під цей елемент перевіряється перед його стартом (диск міг заповнитись
+            // іншими програмами після стартової перевірки) — краще чесна відмова до
+            // копіювання, ніж ENOSPC посеред файла і марні спроби докачки.
             if let entryFiles = remoteFileMaps[entry.path], precountFailures[entry.path] == nil {
                 let needed = entryFiles.reduce(Int64(0)) { $0 + $1.size }
                 if let available = Self.availableCapacity(at: destination), needed + 64 * 1024 * 1024 > available {
@@ -147,9 +145,9 @@ public final class TransferEngine: @unchecked Sendable {
                 index += 1
                 continue
             }
-            // v0.10.2: пробіг із ≥2 плоских файлів поспіль — батчевий шлях (TransferEngine+Batch):
+            // Пробіг із ≥2 плоских файлів поспіль — батчевий шлях (TransferEngine+Batch):
             // один `adb pull -a` на ≤batchSize файлів, один `rm` на батч; дати/verify/move —
-            // поштучно, як і раніше.
+            // поштучно.
             if Self.isPlainFile(entry) {
                 var end = index
                 while end < entries.count, end - index < ADBClient.batchSize,
@@ -205,7 +203,7 @@ public final class TransferEngine: @unchecked Sendable {
 
     /// Крок 1: рекурсивний перелік файлів (для прогресу і верифікації) та тек з датами (для
     /// відновлення після pull) кожного елемента окремо — збій одного не зриває решту. Плоский
-    /// файл (v0.10.2) бере розмір з уже наявного лістингу, без зайвого adb-виклику.
+    /// файл бере розмір з уже наявного лістингу, без зайвого adb-виклику.
     private func precountEntries(
         entries: [RemoteEntry],
         serial: String,
@@ -249,8 +247,8 @@ public final class TransferEngine: @unchecked Sendable {
     }
 
     /// Тягне один елемент (`transferOne`) і, для «Перемістити», вирішує подальше видалення з
-    /// телефона — лише за щойно верифікованим маніфестом (v0.12.2, H4) і лише коли copy успішна
-    /// та не скасована. Повертає готовий результат елемента; сам ніколи не кидає.
+    /// телефона — лише за щойно верифікованим маніфестом і лише коли copy успішна та не
+    /// скасована. Повертає готовий результат елемента; сам ніколи не кидає.
     private func transferAndFinishEntry(
         entry: RemoteEntry,
         expected: [RemoteFileRecord],
@@ -271,7 +269,7 @@ public final class TransferEngine: @unchecked Sendable {
                 progress: &progress, onProgress: onProgress
             )
             var status: TransferItemResult.Status = .copied
-            // 1.3: частковий провал виставлення дати створення — не смертельно (вміст на
+            // Частковий провал виставлення дати створення — не смертельно (вміст на
             // місці), але користувач має про це знати, не лише розробник у NSLog.
             var warning: String? = Self.dateWarning(failures: dateFailures)
             if move {
@@ -282,10 +280,10 @@ public final class TransferEngine: @unchecked Sendable {
                     progress.phase = .deleting
                     onProgress(progress)
                     do {
-                        // Свідомо БЕЗ trackProcess: обрив посеред видалення не має лишити
-                        // півстану. v0.11.0 (P3): теку видаляємо ПОФАЙЛОВО (лише верифіковані
-                        // файли, батчами) і потім лише ПОРОЖНІ теки через rmdir — файл, що
-                        // з'явився на телефоні під час переносу, лишається разом зі своєю текою.
+                        // Свідомо без trackProcess: обрив посеред видалення не має лишити
+                        // півстану. Теку видаляємо пофайлово (лише верифіковані файли,
+                        // батчами) і потім лише порожні теки через rmdir — файл, що з'явився
+                        // на телефоні під час переносу, лишається разом зі своєю текою.
                         if entry.isDirectory {
                             let leftover = try await deleteVerifiedTree(
                                 entry: entry, verified: verified, dirs: dirRecords, serial: serial
@@ -334,8 +332,8 @@ public final class TransferEngine: @unchecked Sendable {
         try fileManager.createDirectory(at: itemTmp, withIntermediateDirectories: true)
         let pulled = itemTmp.appendingPathComponent(entry.name)
 
-        // Перша спроба: pull цілого елемента, як і раніше. Якщо і сам pull, і наступні
-        // дати+verify пройшли чисто — виходимо тут же, докачка (B2) нижче не чіпається.
+        // Перша спроба: pull цілого елемента. Якщо і сам pull, і наступні дати+verify
+        // пройшли чисто — виходимо тут же, докачка нижче не чіпається.
         do {
             try await pullWholeEntry(
                 entry: entry, itemTmp: itemTmp, serial: serial, baseBytesDone: baseBytesDone,

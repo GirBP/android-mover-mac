@@ -15,18 +15,18 @@ public enum ADBError: LocalizedError, Equatable {
     case verificationFailed(String)
     case pullProducedNothing(String)
     case notEnoughDiskSpace(needed: Int64, available: Int64)
-    /// v0.12.2 (M1, аудит M3): бракує місця НА ТЕЛЕФОНІ під push — чесна відмова до першого байта.
+    /// Бракує місця на телефоні під push — чесна відмова до першого байта.
     case notEnoughSpaceOnDevice(needed: Int64, available: Int64)
-    /// v0.14.0 (Wi-Fi): pair/connect/mdns не вдалися — текст із виводу adb.
+    /// pair/connect/mdns не вдалися — текст із виводу adb.
     case wirelessFailed(String)
     case destinationNotWritable(String)
     case statFailed(String)
     case cancelled
     case unsafePushTarget(String)
     case pushVerificationFailed(String)
-    /// v0.11.0 (P1): md5 копії не збігається з телефоном — файл перепулюється (resumable).
+    /// md5 копії не збігається з телефоном — файл перепулюється (resumable).
     case checksumMismatch(String)
-    /// v0.11.0 (P6): файла/теки на телефоні більше нема (видалено після лістингу) — не resumable.
+    /// Файла/теки на телефоні більше нема (видалено після лістингу) — не resumable.
     case remoteMissing(String)
 
     public var errorDescription: String? {

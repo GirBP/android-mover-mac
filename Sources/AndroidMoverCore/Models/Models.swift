@@ -19,9 +19,9 @@ public struct ADBDevice: Identifiable, Equatable, Hashable, Sendable {
         return serial
     }
 
-    /// v0.14.0 (Wi-Fi): транспорт видно з форми serial — `host:port` для TCP-пристроїв, інакше
-    /// USB/емулятор. Адреса ефемерна (порт змінюється після перезавантаження телефона) —
-    /// ідентичність пристрою див. `DeviceIdentity`.
+    /// Транспорт видно з форми serial — `host:port` для TCP-пристроїв, інакше USB/емулятор.
+    /// Адреса ефемерна (порт змінюється після перезавантаження телефона) — ідентичність
+    /// пристрою див. `DeviceIdentity`.
     public var isWireless: Bool { Self.parseHostPort(serial) != nil }
 
     public static func parseHostPort(_ text: String) -> (host: String, port: Int)? {
@@ -66,7 +66,7 @@ public struct RemoteEntry: Identifiable, Hashable, Sendable {
     }
 }
 
-/// Вільне і загальне місце на томі телефона (A2), байти.
+/// Вільне і загальне місце на томі телефона, байти.
 public struct RemoteStorageInfo: Sendable, Equatable {
     public let totalBytes: Int64
     public let availableBytes: Int64
@@ -84,7 +84,7 @@ public struct RemoteStorageInfo: Sendable, Equatable {
     }
 }
 
-/// Розширення медіафайлів — для best-effort MediaStore-рескану після delete/move (A6).
+/// Розширення медіафайлів — для best-effort MediaStore-рескану після delete/move.
 public enum MediaKind {
     public static let mediaExtensions: Set<String> = [
         "jpg", "jpeg", "png", "gif", "heic", "heif", "webp", "dng", "raw",
@@ -114,18 +114,18 @@ public enum RemotePath {
         return p
     }
 
-    /// Для ВВЕДЕНОГО КОРИСТУВАЧЕМ шляху: обрізає випадкові пробіли навколо і нормалізує.
+    /// Для шляху, введеного користувачем,: обрізає випадкові пробіли навколо і нормалізує.
     public static func userInput(_ path: String) -> String {
         normalized(path.trimmingCharacters(in: .whitespacesAndNewlines))
     }
 
-    /// 1.7: розбиває шлях на компоненти по "/" на рівні UNICODE-СКАЛЯРІВ, а не
+    /// Розбиває шлях на компоненти по "/" на рівні unicode-скалярів, а не
     /// Character/grapheme-кластерів. `String.split(separator: "/")` (за замовчуванням
-    /// Character-based) хибно ЗЛИВАЄ "/" із НАСТУПНИМ комбінуючим знаком (напр. U+0306) в один
+    /// Character-based) хибно зливає "/" із наступним комбінуючим знаком (напр. U+0306) в один
     /// grapheme-кластер (правило "Extend" з UAX #29 для "звичайних" символів, на відміну від
     /// "\n", де категорія Control примусово ставить межу) — тоді "/" перестає збігатися як
-    /// окремий символ, і розбиття мовчки ламається для імен, що ПОЧИНАЮТЬСЯ з комбінуючого
-    /// знака (реальний файл з телефона з таким іменем існує — знайдено фазз-тестом 1.7).
+    /// окремий символ, і розбиття мовчки ламається для імен, що починаються з комбінуючого
+    /// знака (реальний файл з телефона з таким іменем існує — знайдено фазз-тестом).
     /// Порожні компоненти (подвійне "//") не включаються — як і дефолтний split.
     private static func pathComponents(_ path: String) -> [String] {
         var components: [String] = []
@@ -162,13 +162,13 @@ public enum RemotePath {
         return d == "/" ? "/\(name)" : "\(d)/\(name)"
     }
 
-    /// Обгортає шлях в одинарні лапки для shell телефона. 1.7: пройдено по UNICODE-СКАЛЯРАХ,
-    /// а НЕ через `replacingOccurrences(of: "'", with:)` (Character/grapheme-based) — той
-    /// варіант мовчки НЕ замінював "'", коли одразу за ним ішов комбінуючий знак (напр.
+    /// Обгортає шлях в одинарні лапки для shell телефона. Проходить по unicode-скалярах,
+    /// а не через `replacingOccurrences(of: "'", with:)` (Character/grapheme-based) — той
+    /// варіант мовчки не замінив би "'", коли одразу за ним іде комбінуючий знак (напр.
     /// U+0306): "'" + Extend зливаються в один grapheme-кластер, який більше не збігається з
-    /// самотнім Character("'"), і replacingOccurrences тихо нічого не робить — лапка лишається
-    /// НЕекранованою, ламаючи shell-квотинг (знайдено фазз-тестом 1.7). На рівні
-    /// unicodeScalars така фузія не існує — кожен "'" завжди зіставляється сам із собою.
+    /// самотнім Character("'"), і replacingOccurrences тихо нічого не робить — лапка лишилась
+    /// би неекранованою, ламаючи shell-квотинг (знайдено фазз-тестом). На рівні unicodeScalars
+    /// така фузія не існує — кожен "'" завжди зіставляється сам із собою.
     public static func shellQuote(_ path: String) -> String {
         var result = String.UnicodeScalarView()
         result.append("'")
@@ -183,9 +183,9 @@ public enum RemotePath {
         return String(result)
     }
 
-    /// Шляхи, які заборонено видаляти. Захищає корені ВСІХ томів (включно зі знімними
+    /// Шляхи, які заборонено видаляти. Захищає корені всіх томів (включно зі знімними
     /// SD-картками /storage/XXXX-XXXX) — rm -rf по точці монтування стер би цілий том.
-    /// Дозволено видаляти лише вміст УСЕРЕДИНІ тому користувацького сховища.
+    /// Дозволено видаляти лише вміст усередині тому користувацького сховища.
     public static func isUnsafeToDelete(_ path: String) -> Bool {
         let p = normalized(path)
         guard p.hasPrefix("/") else { return true }
@@ -218,7 +218,7 @@ public enum RemotePath {
         }
     }
 
-    /// Шляхи, куди дозволено ПИСАТИ (push, B1). На відміну від isUnsafeToDelete — сам корінь
+    /// Шляхи, куди дозволено писати (push). На відміну від isUnsafeToDelete — сам корінь
     /// /sdcard чи будь-якого тому під /storage/... писати можна (mkdir/push туди безпечні,
     /// на відміну від rm -rf кореня, який стер би точку монтування). Захищає лише те, що поза
     /// користувацьким сховищем (/data, /system, /mnt тощо), і компоненти "." / "..", якими

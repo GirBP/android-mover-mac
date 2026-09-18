@@ -1,15 +1,14 @@
 import SwiftUI
 
-/// 3.3: немодальна панель черги операцій (Safari Downloads-стиль) — сідає між таблицею й
-/// bottomBar у BrowserView, лише коли `transfers.queue` непорожня (нема операцій — нема
-/// панелі, вигляд ідентичний до-3.3). Не блокує браузинг: таблиця й поллер листингу
-/// (BrowserStore) продовжують працювати, доки показана ця панель.
+/// Немодальна панель черги операцій (Safari Downloads-стиль) — сідає між таблицею й
+/// bottomBar у BrowserView, лише коли `transfers.queue` непорожня. Не блокує браузинг:
+/// таблиця й поллер листингу (BrowserStore) продовжують працювати, доки показана ця панель.
 struct OperationQueuePanel: View {
     let transfers: TransferCoordinator
     /// BrowserView вирішує, у який саме `@State` (detailsTransfer/detailsPush) покласти
     /// конкретно типізовану сесію — тут лишається лише exhaustive switch по OperationItem.
     let onShowDetails: (OperationItem) -> Void
-    // 3.6: анімація згортання/розгортання — лише коли користувач не просив менше руху.
+    // Анімація згортання/розгортання — лише коли користувач не просив менше руху.
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -21,8 +20,8 @@ struct OperationQueuePanel: View {
                     rows
                 }
             }
-            // v0.10.2: звичайний фон вікна замість .thinMaterial — матеріал «просвічував»
-            // під сусідній сайдбар NavigationSplitView і забарвлював його низ.
+            // Звичайний фон вікна, не .thinMaterial — той матеріал «просвічує» під
+            // сусідній сайдбар NavigationSplitView і забарвлює його низ.
             .background(Color(nsColor: .windowBackgroundColor))
             .overlay(alignment: .top) { Divider() }
         }
@@ -39,7 +38,7 @@ struct OperationQueuePanel: View {
     private var header: some View {
         HStack(spacing: 8) {
             Button {
-                // 3.6: Reduce Motion — без withAnimation, коли користувач просив менше руху.
+                // Reduce Motion — без withAnimation, коли користувач просив менше руху.
                 if reduceMotion {
                     transfers.isQueuePanelExpanded.toggle()
                 } else {
@@ -63,8 +62,7 @@ struct OperationQueuePanel: View {
                         .foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                 }
-                // v0.10.2: клік по всьому вільному простору шапки згортає/розгортає, не лише
-                // по бейджу.
+                // Клік по всьому вільному простору шапки згортає/розгортає, не лише по бейджу.
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
             }
@@ -87,8 +85,8 @@ struct OperationQueuePanel: View {
         .padding(.vertical, 8)
     }
 
-    /// v0.10.2: висота — за вмістом (ScrollView з maxHeight розтягувався на всі 220 pt навіть
-    /// під один рядок і з'їдав півтаблиці); скрол з'являється лише від 4 елементів.
+    /// Висота — за вмістом (ScrollView з maxHeight розтягувався б на всі 220 pt навіть
+    /// під один рядок і з'їдав би півтаблиці); скрол з'являється лише від 4 елементів.
     @ViewBuilder
     private var rows: some View {
         if transfers.queue.count <= 3 {
@@ -119,7 +117,7 @@ struct OperationQueuePanel: View {
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
-                // Аудит-фікс (п.1): "· <пристрій>" — той, ДЛЯ КОГО елемент поставлено в чергу
+                // "· <пристрій>" — той, для кого елемент поставлено в чергу
                 // (targetDeviceLabel), не поточний активний — вони можуть розійтись, поки
                 // елемент чекав своєї черги.
                 Text("\(item.title) · \(item.itemCount) елем. · \(item.targetDeviceLabel)")
@@ -146,7 +144,7 @@ struct OperationQueuePanel: View {
             VStack(alignment: .leading, spacing: 4) {
                 ProgressView(value: item.progressFraction)
                     .progressViewStyle(.linear)
-                    // 3.6: фаза — label ("Копіюю з телефона…"), відсоток — value.
+                    // Фаза — label ("Копіюю з телефона…"), відсоток — value.
                     .accessibilityLabel(item.phaseLabel)
                     .accessibilityValue("\(Int(item.progressFraction * 100))%")
                 HStack(spacing: 6) {
@@ -157,7 +155,7 @@ struct OperationQueuePanel: View {
                             .truncationMode(.middle)
                     }
                     Spacer(minLength: 8)
-                    // v0.10.4: швидкість і орієнтовний залишок часу.
+                    // Швидкість і орієнтовний залишок часу.
                     if let throughput = item.throughputLabel {
                         Text(throughput)
                             .monospacedDigit()
@@ -172,8 +170,8 @@ struct OperationQueuePanel: View {
                 Text(item.summaryTitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                // v0.10.3: причина провалу — тут, а не лише за «Деталі…» (власник бачив
-                // «Не вдалося почати перенесення» без пояснення).
+                // Причина провалу — тут, а не лише за «Деталі…», щоб не лишати «Не вдалося
+                // почати перенесення» без пояснення.
                 if let error = item.globalError {
                     Text(error)
                         .font(.caption)
@@ -200,7 +198,7 @@ struct OperationQueuePanel: View {
             HStack(spacing: 10) {
                 if !item.showInFinderURLs.isEmpty {
                     Button("Показати у Finder") {
-                        // v0.10.2: виділяє ВСІ перенесені файли пакету, не лише перший.
+                        // Виділяє всі перенесені файли пакету, не лише перший.
                         NSWorkspace.shared.activateFileViewerSelecting(item.showInFinderURLs)
                     }
                     .buttonStyle(.plain)

@@ -1,6 +1,6 @@
 import Foundation
 
-// Типи прогресу/результату TransferEngine — винесено з TransferEngine.swift (DoD ≤400 рядків).
+// Типи прогресу/результату TransferEngine — винесено з TransferEngine.swift.
 
 public struct TransferProgress: Sendable {
     public enum Phase: Sendable, Equatable {
@@ -8,11 +8,11 @@ public struct TransferProgress: Sendable {
         case pulling
         case settingDates
         case verifying
-        /// v0.11.0 (P1): звірка md5 з телефоном перед видаленням/за політикою.
+        /// Звірка md5 з телефоном перед видаленням/за політикою.
         case checksumming
-        /// B2: pull або verify провалились — чекаємо повернення пристрою перед новою спробою.
+        /// Pull або verify провалились — чекаємо повернення пристрою перед новою спробою.
         case waitingForDevice
-        /// B2: пристрій повернувся — дотягуємо лише відсутні/биті файли елемента.
+        /// Пристрій повернувся — дотягуємо лише відсутні/биті файли елемента.
         case resuming
         case deleting
         case finished
@@ -26,7 +26,7 @@ public struct TransferProgress: Sendable {
     public var currentName: String = ""
     public var bytesTotal: Int64 = 0
     public var bytesDone: Int64 = 0
-    /// v0.11.0: номер спроби докачки (0 — перша, штатна) — UI показує «(спроба N)».
+    /// Номер спроби докачки (0 — перша, штатна) — UI показує «(спроба N)».
     public var attempt: Int = 0
 
     public var fraction: Double {

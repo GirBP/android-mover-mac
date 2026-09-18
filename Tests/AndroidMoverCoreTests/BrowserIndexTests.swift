@@ -2,11 +2,11 @@ import Foundation
 import XCTest
 @testable import AndroidMoverCore
 
-/// v0.10.1 (перф-фікс): BrowserIndex — незмінний, побудований РАЗ знімок відсортованої й
-/// відфільтрованої теки, що замінив некешовані `BrowserStore.sortedEntries`/`filteredEntries`
-/// (повний sort+filter на КОЖЕН доступ — критичний баг на теках з десятками тисяч файлів).
-/// Тут: коректність (теки зверху, натуральний сорт імен, приховані/tmp, регістронезалежний
-/// пошук, стабільність сортування, узгодженість visibleIDs/byID) і бенчмарк 50k елементів.
+/// BrowserIndex — незмінний, побудований раз знімок відсортованої й відфільтрованої теки:
+/// повний sort+filter на кожен доступ був би критичним багом на теках з десятками тисяч
+/// файлів. Тут: коректність (теки зверху, натуральний сорт імен, приховані/tmp,
+/// регістронезалежний пошук, стабільність сортування, узгодженість visibleIDs/byID) і
+/// бенчмарк 50k елементів.
 final class BrowserIndexTests: XCTestCase {
 
     private static let loneDate = Date(timeIntervalSince1970: 1_650_000_000)
@@ -32,7 +32,7 @@ final class BrowserIndexTests: XCTestCase {
             entry("a.jpg", size: 900),
             entry("Заметки", isDirectory: true, size: 4096),
         ]
-        // Сорт по .size, descending — теки все одно мусять бути ПЕРШИМИ, незалежно від
+        // Сорт по .size, descending — теки все одно мусять бути першими, незалежно від
         // того, що їхній "розмір" (inode) менший/більший за файли.
         let spec = BrowserIndex.SortSpec(field: .size, ascending: false)
         let index = BrowserIndex.build(entries: entries, sortSpec: spec, filterText: "", showHidden: true)
@@ -60,13 +60,12 @@ final class BrowserIndexTests: XCTestCase {
         XCTAssertEqual(index.visibleEntries.map(\.name), ["IMG_10.jpg", "IMG_2.jpg", "IMG_1.jpg"])
     }
 
-    // MARK: - Аудит-фікс (high): українська колація — Ґ/Є/І/Ї на алфавітних місцях
+    // MARK: - Українська колація — Ґ/Є/І/Ї на алфавітних місцях
 
-    /// Регресійний тест на high-знахідку: перша версія `naturalSortKey` порівнювала нецифрові
-    /// символи через сирий Unicode code point, і Ґ/Є/І/Ї (U+0490/0404/0406/0407, поза
-    /// основним кириличним блоком U+0430-044F) стрибали в кінець списку замість своїх
-    /// алфавітних місць. Очікуваний порядок нижче звірено з РЕАЛЬНИМ ICU-порівнянням
-    /// (`String.compare(locale: "uk")`), а не переписаний "на око".
+    /// Регресійний тест: порівняння нецифрових символів сирим Unicode code point-ом кидає
+    /// Ґ/Є/І/Ї (U+0490/0404/0406/0407, поза основним кириличним блоком U+0430-044F) у кінець
+    /// списку замість їхніх алфавітних місць. Очікуваний порядок нижче звірено з реальним
+    /// ICU-порівнянням (`String.compare(locale: "uk")`), а не переписаний "на око".
     func testNameNaturalSortOrdersUkrainianCyrillicByAlphabetNotCodePoint() {
         let words = ["Айстри", "Груша", "Ґудзик", "Дерево", "Європа", "Жито", "Зима", "Их", "Їжак", "Йога", "Індія"]
         let entries = words.shuffled().map { entry($0) }
@@ -141,7 +140,7 @@ final class BrowserIndexTests: XCTestCase {
         XCTAssertEqual(index.visibleEntries.map(\.name), ["Фото Відпустки.jpg"])
     }
 
-    // MARK: - refiltered НІКОЛИ не пересортовує
+    // MARK: - refiltered ніколи не пересортовує
 
     func testRefilteredNeverResorts() {
         let entries = [entry("c.jpg", size: 300), entry("a.jpg", size: 100), entry("b.jpg", size: 200)]
@@ -150,7 +149,7 @@ final class BrowserIndexTests: XCTestCase {
         XCTAssertEqual(built.visibleEntries.map(\.name), ["a.jpg", "b.jpg", "c.jpg"])
 
         // Кілька рефільтрацій з різним filterText/showHidden — відносний порядок серед
-        // елементів, що лишились видимими, УСІ рази строго відповідає порядку build() (за
+        // елементів, що лишились видимими, усі рази строго відповідає порядку build() (за
         // size, не за назвою — якби refiltered пересортовувала, "b" опинилась би перед "c"
         // за size, але порядок за назвою збігається тут випадково, тож перевіряємо явно
         // через .jpg-набір, де size-порядок ("a","c") відрізнявся б від name-порядку).
@@ -165,18 +164,17 @@ final class BrowserIndexTests: XCTestCase {
                        "refiltered НЕ пересортовує назад до алфавітного порядку")
     }
 
-    // MARK: - Аудит-фікс (критично): build()'s filterText/showHidden — лише знімок,
-    // фінальний видимий результат визначає ОСТАННІЙ refiltered(), не аргументи build()
+    // MARK: - build()'s filterText/showHidden — лише знімок, фінальний видимий результат
+    // визначає останній refiltered(), не аргументи build()
 
-    /// Регресійний тест на критичну знахідку (BrowserStore.scheduleIndexRebuild): раніше
-    /// `Task.detached` капчурював filterText/showHidden НА МОМЕНТ ПЛАНУВАННЯ і `build()` з
-    /// ними приземлявся як є, тихо затираючи новіший результат пошуку. Фікс — будувати
-    /// (сортувати) з ПОРОЖНІМ фільтром, а на приземленні застосовувати ЖИВИЙ
-    /// filterText/showHidden через `refiltered(...)`. Цей тест захищає інваріант, на якому
-    /// той фікс тримається: `build(filterText:hidden:)` з БУДЬ-ЯКИМИ аргументами, а потім
-    /// `.refiltered(...)` з ІНШИМИ, дає ТОЙ САМИЙ результат, що прямий `build()` з тими
-    /// самими фінальними аргументами — тобто аргументи build() ніяк не "просочуються" у
-    /// фінальний видимий стан повз refiltered().
+    /// Захищає інваріант, на якому тримається BrowserStore.scheduleIndexRebuild: `build()`
+    /// сортує з порожнім фільтром, а на приземленні `Task.detached` застосовує живий
+    /// filterText/showHidden через `refiltered(...)` — захоплення filterText/showHidden на
+    /// момент планування тихо затирало б новіший результат пошуку. Тест звіряє:
+    /// `build(filterText:hidden:)` з будь-якими аргументами, а потім `.refiltered(...)` з
+    /// іншими, дає той самий результат, що прямий `build()` з тими самими фінальними
+    /// аргументами — тобто аргументи build() ніяк не "просочуються" у фінальний видимий стан
+    /// повз refiltered().
     func testRefilteredResultIsIndependentOfBuildTimeFilterArguments() {
         let entries = [
             entry("Фото Відпустки.jpg"), entry("Документ.pdf"), entry(".hidden.jpg"),
@@ -240,16 +238,13 @@ final class BrowserIndexTests: XCTestCase {
         return entries.shuffled()
     }
 
-    /// Ціль (постановка задачі): < 150мс на M-серії (RELEASE) — виміряно фактично ~122-129мс
-    /// (`swift test -c release`, Apple M2, 5 прогонів) — ближче до межі, ніж перша версія
-    /// (`naturalSortKey` із сирим Unicode code point замість `characterWeights`, ~78-92мс), бо
-    /// аудит-фікс high (колація Ґ/Є/І/Ї/діакритики, BrowserIndex.swift) додав dictionary-lookup
-    /// на кожен нецифровий символ під час генерації ключа — але й досі вкладається в ціль.
-    /// `swift test` за замовчуванням — DEBUG build (без оптимізацій, виміряно ~309-318мс, 5
-    /// прогонів), тож ліміт тут м'якший; фактичний час логується в XCTAssert-повідомленні
-    /// незалежно від результату. (Аудит-фікс low: попередні числа в цьому коментарі — ~78-92мс/
-    /// ~250-300мс — не відповідали фактичним замірам НАВІТЬ до high-фіксу колації; тепер числа
-    /// перевірені незалежним прогоном, а не переписані з чернетки коментарів кодера.)
+    /// Ціль: < 150 мс на M-серії (RELEASE) — виміряно фактично ~122-129 мс (`swift test -c
+    /// release`, Apple M2, 5 прогонів); `characterWeights` (колація Ґ/Є/І/Ї/діакритики,
+    /// BrowserIndex.swift) додає dictionary-lookup на кожен нецифровий символ під час
+    /// генерації ключа, тому й лишається помітний запас до межі. `swift test` за
+    /// замовчуванням — DEBUG build (без оптимізацій, виміряно ~309-318 мс, 5 прогонів), тож
+    /// ліміт тут м'якший; фактичний час логується в XCTAssert-повідомленні незалежно від
+    /// результату.
     func testBuildPerformanceOn50kEntries() {
         let entries = makeSyntheticEntries(count: 50_000)
         let spec = BrowserIndex.SortSpec(field: .name, ascending: true)
@@ -257,22 +252,19 @@ final class BrowserIndexTests: XCTestCase {
         let index = BrowserIndex.build(entries: entries, sortSpec: spec, filterText: "", showHidden: false)
         let elapsed = Date().timeIntervalSince(start)
         XCTAssertEqual(index.visibleEntries.count, 50_000)
-        // v0.10.3: 1.0 с (було 0.5) — під паралельною збіркою/іншими тестами DEBUG-прогін флейкав;
-        // старий код на 50k робив те саме сортування НА КОЖЕН рендер, тож і 1 с — досі жорстка межа.
+        // 1.0 с — під паралельною збіркою/іншими тестами DEBUG-прогін флейкає на меншому
+        // порозі, тож 1 с лишається жорсткою межею.
         XCTAssertLessThanOrEqual(elapsed, 1.0, "побудова індексу на 50k мала вкластись у розумний час (\(elapsed) с, DEBUG build)")
     }
 
-    /// Ціль (постановка задачі): < 30мс на M-серії (RELEASE) — виміряно фактично ~56-57мс
-    /// (`swift test -c release`, 5 прогонів; трохи вище цілі: `localizedCaseInsensitiveContains`
-    /// — ICU-порівняння з підтримкою кирилиці, свідомо НЕ замінене на дешевший ASCII-only
-    /// fast-path, щоб не зламати коректний пошук по кирилиці,
-    /// testFilterTextUsesLocalizedCaseInsensitiveMatch). Однаково лінійний прохід (без
-    /// сортування) — набагато дешевший за build() і на порядок швидший за старий
-    /// sortedEntries+filter на кожен keystroke, який і викликав "ледь реагує" з діагностики.
-    /// Аудит-фікс (medium): `BrowserStore.scheduleRefilter()` тепер кличе цю функцію ОФФ-main
-    /// (`Task.detached`, з generation-guard — BrowserStore.swift) замість синхронно в тілі
-    /// filterText/showHidden didSet, тож навіть ці ~56мс більше НЕ блокують MainActor на кожен
-    /// keystroke — число тут лишається як цільовий бенчмарк самої (чистої) роботи.
+    /// Ціль: < 30 мс на M-серії (RELEASE) — виміряно фактично ~56-57 мс (`swift test -c
+    /// release`, 5 прогонів; трохи вище цілі: `localizedCaseInsensitiveContains` — ICU-порівняння
+    /// з підтримкою кирилиці, свідомо не замінене на дешевший ASCII-only fast-path, щоб не
+    /// зламати коректний пошук по кирилиці, testFilterTextUsesLocalizedCaseInsensitiveMatch).
+    /// Лінійний прохід (без сортування) — набагато дешевший за build(). `BrowserStore.
+    /// scheduleRefilter()` кличе цю функцію офф-main (`Task.detached`, з generation-guard —
+    /// BrowserStore.swift), тож ці ~56 мс не блокують MainActor на кожен keystroke — число тут
+    /// лишається як цільовий бенчмарк самої (чистої) роботи.
     func testRefilterPerformanceOn50kEntries() {
         let entries = makeSyntheticEntries(count: 50_000)
         let spec = BrowserIndex.SortSpec(field: .name, ascending: true)

@@ -11,65 +11,65 @@ Env:
   MOCK_STATE            — device | unauthorized | offline | none (default: device)
   MOCK_CORRUPT_PULL     — "1": після pull обрізати перший файл (тест верифікації), безлімітно
   MOCK_FAIL_DELETE      — "1": вдавати невдале видалення
-  MOCK_FAIL_PUSH        — "1": push завершується кодом 1 (B1)
-  MOCK_CORRUPT_PUSH     — "1": після push обрізати перший файл навпіл (тест push-верифікації, B1)
+  MOCK_FAIL_PUSH        — "1": push завершується кодом 1
+  MOCK_CORRUPT_PUSH     — "1": після push обрізати перший файл навпіл (тест push-верифікації)
 
-  B2 (resume/докачка після обриву) — стан лічильників між викликами (кожен виклик mock —
+  Resume/докачка після обриву — стан лічильників між викликами (кожен виклик mock —
   окремий процес) живе у файлі MOCK_STATE_FILE, який тест виділяє в tmp:
   MOCK_STATE_FILE       — шлях до файлу стану (простий текст "key=value" по рядках,
                           атомарний перезапис через os.replace). Без нього лічильники
                           нижче — no-op (кожен виклик поводиться як звичайний pull).
-  MOCK_PULL_FAIL_COUNT  — "n": перші n УСПІШНИХ pull-викликів (будь-яких — цілого елемента чи
-                          докачки одного файла) натомість копіюють ЧАСТКОВО: для теки — перший
+  MOCK_PULL_FAIL_COUNT  — "n": перші n успішних pull-викликів (будь-яких — цілого елемента чи
+                          докачки одного файла) натомість копіюють частково: для теки — перший
                           файл повністю, другий обрізаний навпіл, решту не чіпають; для
                           одиночного файла — обрізаний навпіл. Пишуть у stderr adb-подібну
                           помилку обриву з'єднання і завершуються кодом 1. Лічильник
                           декрементується з кожним спрацюванням.
-  MOCK_CORRUPT_PULL_COUNT — "n": перші n pull-викликів завершуються УСПІШНО (exit 0), але
+  MOCK_CORRUPT_PULL_COUNT — "n": перші n pull-викликів завершуються успішно (exit 0), але
                           перший файл результату обрізаний навпіл (тиха побитість — verify
                           мусить сам її зловити). Той самий ефект, що MOCK_CORRUPT_PULL, але
                           лічений і скінченний — на n+1-й виклик пул знову чистий.
   MOCK_WAIT_HANG        — "1": `adb wait-for-device` засинає на 30 с замість негайного
                           exit 0 — для тестів скасування посеред очікування (не залежних
                           від таймауту).
-  MOCK_FREE_BYTES       — "n": `stat -f` звітує рівно n вільних байтів (v0.12.2, тест
-                          відмови push у повний телефон).
-  MOCK_ANDROID_ID / MOCK_SERIALNO — значення зонда ідентичності (v0.14.0); порожній рядок =
+  MOCK_FREE_BYTES       — "n": `stat -f` звітує рівно n вільних байтів (тест відмови push
+                          у повний телефон).
+  MOCK_ANDROID_ID / MOCK_SERIALNO — значення зонда ідентичності; порожній рядок =
                           недоступно на цьому OEM (драбина DeviceIdentity падає нижче).
   MOCK_MDNS             — "1": `adb mdns check` доступний; інакше «unavailable», exit 1.
   MOCK_MDNS_SERVICES    — "name,type,host:port;…" — рядки для `adb mdns services`.
   MOCK_PAIR_CODE        — код, який приймає `adb pair` (типово 123456); інший → провал.
   MOCK_CONNECT_FAIL     — "1": `adb connect` відмовляє («failed to connect…», exit 1).
-  MOCK_LOG_FILE         — шлях до файлу, куди КОЖЕН виклик mock дописує один рядок —
+  MOCK_LOG_FILE         — шлях до файлу, куди кожен виклик mock дописує один рядок —
                           JSON-масив свого argv (без argv[0]) — тести звіряють, скільки й
                           яких саме pull-викликів сталось (докачка мусить пулити лише
                           відсутній/битий файл, не весь елемент заново).
 
-  1.2 (ідле-таймаут ProcessRunner) — обидві ручки діють лише в do_find (гілка "-type f",
+  Ідле-таймаут ProcessRunner — обидві ручки діють лише в do_find (гілка "-type f",
   тобто ADBClient.recursiveFiles):
-  MOCK_SLOW_STREAM      — "ms": рядки результату друкуються ПО ОДНОМУ з паузою ms між ними
+  MOCK_SLOW_STREAM      — "ms": рядки результату друкуються по одному з паузою ms між ними
                           (з flush після кожного) — емулює повільний, але живий потік виводу;
                           ідле-таймаут не мусить спрацьовувати, доки паузи коротші за нього.
-  MOCK_SILENT_BEFORE    — "ms": спати ms ДО першого рядка виводу — емулює завислий процес;
+  MOCK_SILENT_BEFORE    — "ms": спати ms до першого рядка виводу — емулює завислий процес;
                           з ідле-таймаутом коротшим за ms клієнт мусить обірвати виклик.
 
-  1.6 (chaos-mock) — діють на БУДЬ-ЯКИЙ виклик mock (shell/pull/push/devices), рахуються
+  Chaos-mock — діють на будь-який виклик mock (shell/pull/push/devices), рахуються
   через той самий MOCK_STATE_FILE, спільний лічильник "__CALL_INDEX__":
-  MOCK_DISCONNECT_ON_CALL — "n": рівно n-й ЗА ЛІКОМ виклик mock (від 1, per-процес, тобто
+  MOCK_DISCONNECT_ON_CALL — "n": рівно n-й за ліком виклик mock (від 1, per-процес, тобто
                           рахуючи усі попередні adb-виклики тестового сценарію, якщо вони
                           теж бачили той самий MOCK_STATE_FILE) вдає обрив з'єднання: пише
                           у stderr "error: device 'MOCK001' not found" і завершується кодом
-                          1 ДО будь-якої іншої обробки; решта викликів — штатні.
-  MOCK_SLOW             — "ms": пауза ms ПЕРЕД КОЖНИМ викликом mock (для таймінг-тестів;
+                          1 до будь-якої іншої обробки; решта викликів — штатні.
+  MOCK_SLOW             — "ms": пауза ms перед кожним викликом mock (для таймінг-тестів;
                           не обов'язково використовувати).
 
-  2.4 (adb track-devices, ProcessRunner.stream()) — `adb track-devices` (БЕЗ "-s SERIAL",
+  adb track-devices (ProcessRunner.stream()) — `adb track-devices` (без "-s SERIAL",
   на відміну від shell/pull/push/wait-for-device): друкує кадри протоколу (4 hex-символи
-  довжини + payload у форматі `adb devices` без заголовка) на КОЖНУ зміну підключення:
+  довжини + payload у форматі `adb devices` без заголовка) на кожну зміну підключення:
   MOCK_TRACK_FILE       — шлях до файлу "стану" (простий текст: device|unauthorized|offline|
                           none), який тест переписує, щоб емулювати підключення/відключення.
                           Перший кадр — за вмістом файлу (чи MOCK_STATE, якщо файла ще
-                          нема), далі кожні 200 мс перечитується; при ЗМІНІ вмісту — новий
+                          нема), далі кожні 200 мс перечитується; при зміні вмісту — новий
                           кадр. Завершується (exit 0), коли файл видалено. Без цієї ручки —
                           один кадр за MOCK_STATE, потім `sleep 1`, exit 0.
 """
@@ -82,7 +82,7 @@ import time
 
 
 def log_call(argv):
-    """B2: дописує один рядок (JSON-масив argv) у MOCK_LOG_FILE — якщо ручка не задана, no-op."""
+    """Дописує один рядок (JSON-масив argv) у MOCK_LOG_FILE — якщо ручка не задана, no-op."""
     path = os.environ.get("MOCK_LOG_FILE")
     if not path:
         return
@@ -121,7 +121,7 @@ def _write_state(state):
 
 
 def consume_counter(env_name):
-    """B2: ручки MOCK_PULL_FAIL_COUNT / MOCK_CORRUPT_PULL_COUNT — файл-лічильник стану між
+    """Ручки MOCK_PULL_FAIL_COUNT / MOCK_CORRUPT_PULL_COUNT — файл-лічильник стану між
     викликами (кожен виклик mock — окремий процес, тому рахувати можна лише через диск).
     Перший виклик ініціалізує лічильник у MOCK_STATE_FILE значенням env-змінної, кожен
     наступний декрементує. Повертає True рівно n разів (n — значення env), потім False.
@@ -157,9 +157,9 @@ def consume_counter(env_name):
 
 
 def call_index_and_increment():
-    """1.6: глобальний, наскрізний лічильник викликів mock (1-індексований), для
+    """Глобальний, наскрізний лічильник викликів mock (1-індексований), для
     MOCK_DISCONNECT_ON_CALL. На відміну від consume_counter (окремий бюджет на env-ім'я,
-    декрементується) — це один спільний рахунок УСІХ викликів mock, що бачили той самий
+    декрементується) — це один спільний рахунок усіх викликів mock, що бачили той самий
     MOCK_STATE_FILE, під ключем "__CALL_INDEX__". Без MOCK_STATE_FILE — no-op (None):
     порахувати нема як, ручка, що на нього спирається, тоді теж мовчки бездіє.
     """
@@ -236,7 +236,7 @@ def effective_local(script, am_p):
     """Локальний шлях + фонова (телефонна) база для друку %n.
 
     Емулює `AM_R=$(readlink -f ...)` зі скрипта клієнта: якщо скрипт містить readlink —
-    розіменовуємо і повертаємо КАНОНІЧНУ телефонну базу (як зробив би реальний shell).
+    розіменовуємо і повертаємо канонічну телефонну базу (як зробив би реальний shell).
     """
     local = translate(am_p)
     base = am_p.rstrip("/") or "/"
@@ -273,10 +273,10 @@ def do_list(script, am_p):
 def do_find(am_p):
     """Емулює `find "$AM_P" -type f -exec stat -c '%s|%n' {} +` (ADBClient.recursiveFiles).
 
-    1.2: MOCK_SILENT_BEFORE=ms — спати ms ДО першого рядка (тест ідле-таймауту, що вбиває
+    MOCK_SILENT_BEFORE=ms — спати ms перед першим рядком (тест ідле-таймауту, що вбиває
     завислий процес); MOCK_SLOW_STREAM=ms — друкувати результат рядок-за-рядком з паузою ms
     між ними, flush після кожного (щоб реально стрімити через пайп, а не осісти в буфері
-    Python до самого виходу) — тест, що ідле-таймаут НЕ рве живий, хай і повільний, потік.
+    Python до самого виходу) — тест, що ідле-таймаут не рве живий, хай і повільний, потік.
     """
     local = translate(am_p)
     if local is None or not os.path.lexists(local):
@@ -363,7 +363,7 @@ def _md5_line(local, remote_path):
 
 
 def do_md5(am_p):
-    """v0.11.0: емулює checksums — файл: один рядок; тека: рекурсивно (GNU-формат `hash  path`)."""
+    """Емулює checksums — файл: один рядок; тека: рекурсивно (GNU-формат `hash  path`)."""
     local = translate(am_p)
     if local is None or not os.path.lexists(local):
         print("__AM_MISSING__")
@@ -388,7 +388,7 @@ def do_md5_many(paths):
 
 
 def do_rmdir_many(paths):
-    """v0.11.0: removeEmptyDirectories — rmdir лише порожніх; непорожні → __AM_NOT_EMPTY__|path."""
+    """removeEmptyDirectories — rmdir лише порожніх; непорожні → __AM_NOT_EMPTY__|path."""
     for p in paths:
         local = translate(p)
         if local is None:
@@ -402,7 +402,7 @@ def do_rmdir_many(paths):
 
 
 def do_delete_many(paths):
-    """v0.10.2: емулює deleteMany — на кожен шлях, що НЕ вдалося видалити, рядок
+    """Емулює deleteMany — на кожен шлях, що не вдалося видалити, рядок
     `__AM_DELETE_FAILED__|<шлях>` (шлях останнім). MOCK_FAIL_DELETE=1 — провал усіх."""
     for p in paths:
         if not delete_one(p):
@@ -433,7 +433,7 @@ def delete_one(am_p):
 
 
 def do_mkdir_p(am_p):
-    """v0.11.0: makeDirectories (mkdir -p)."""
+    """makeDirectories (mkdir -p)."""
     local = translate(am_p)
     if local is not None:
         os.makedirs(local, exist_ok=True)
@@ -468,7 +468,7 @@ def do_rename(am_p, am_q):
 
 
 def do_remote_exists(am_p):
-    """Емулює `if [ -e "$AM_P" ]; then echo __AM_EXISTS__; else echo __AM_ABSENT__; fi` (B1)."""
+    """Емулює `if [ -e "$AM_P" ]; then echo __AM_EXISTS__; else echo __AM_ABSENT__; fi`."""
     local = translate(am_p)
     if local is not None and os.path.exists(local):  # -e стежить за symlink, як os.path.exists
         print("__AM_EXISTS__")
@@ -477,7 +477,7 @@ def do_remote_exists(am_p):
 
 
 def do_stat_mtimes(am_p):
-    """Емулює `find "$AM_P" -exec stat -c '%Y|%n' {} +` — файли І теки, БЕЗ -type (B1).
+    """Емулює `find "$AM_P" -exec stat -c '%Y|%n' {} +` — файли і теки, без -type.
 
     На відміну від do_dirs (-type d) і do_find (-type f, %s|%n), тут немає фільтра типу:
     і корінь, і кожна вкладена тека, і кожен файл друкуються з тим самим форматом '%Y|%n'.
@@ -508,12 +508,12 @@ def do_stat_mtimes(am_p):
 
 
 def do_statfs(am_p):
-    """Емулює `toybox stat -f -c '%a|%b|%S' "$AM_P"` через os.statvfs (A2)."""
+    """Емулює `toybox stat -f -c '%a|%b|%S' "$AM_P"` через os.statvfs."""
     local = translate(am_p)
     if local is None or not os.path.exists(local):
         print("__AM_STAT_FAILED__")
         return
-    # v0.12.2 (M1): MOCK_FREE_BYTES — підмінити вільне місце (тест «повний телефон» для push).
+    # MOCK_FREE_BYTES — підмінити вільне місце (тест «повний телефон» для push).
     override = os.environ.get("MOCK_FREE_BYTES")
     if override is not None:
         frsize = 4096
@@ -529,19 +529,19 @@ def do_statfs(am_p):
 
 
 def do_rescan():
-    """MediaStore-рескан (A6) — best-effort, ефект на реальному телефоні не емулюємо."""
+    """MediaStore-рескан — best-effort, ефект на реальному телефоні не емулюємо."""
     print("__AM_SCAN_DONE__")
 
 
 def do_props():
-    """v0.14.0 (Wi-Fi): зонд ідентичності — MOCK_ANDROID_ID / MOCK_SERIALNO ('' = недоступно)."""
+    """Зонд ідентичності — MOCK_ANDROID_ID / MOCK_SERIALNO ('' = недоступно)."""
     print(f"__AM_ID__|{os.environ.get('MOCK_ANDROID_ID', 'a1b2c3d4e5f60718')}")
     print(f"__AM_SN__|{os.environ.get('MOCK_SERIALNO', 'MOCKSN001')}")
     print("__AM_MODEL__|Mock Phone 9")
 
 
 def parse_opcode(script):
-    """v0.15.0 (M3): `AM_OP=<опкод>; …` — перший рядок кожного скрипта ADBScripts (Swift)."""
+    """`AM_OP=<опкод>; …` — перший рядок кожного скрипта ADBScripts (Swift)."""
     if not script.startswith("AM_OP="):
         return None
     end = script.find(";")
@@ -553,8 +553,8 @@ def batch_items(script):
     return parse_quoted_list(body[len("for AM_P in "):body.index("; do")])
 
 
-# v0.15.0 (M3): диспетчер за опкодом — точний збіг, порядок гілок більше не має значення.
-# ContractTests (Swift) перевіряють, що тут є гілка на КОЖЕН ADBOpcode.
+# Диспетчер за опкодом — точний збіг, порядок гілок не має значення.
+# ContractTests (Swift) перевіряють, що тут є гілка на кожен ADBOpcode.
 OPCODE_HANDLERS = {
     "getProps": lambda s: do_props(),
     "rescanPaths": lambda s: do_rescan(),
@@ -577,8 +577,8 @@ OPCODE_HANDLERS = {
 
 
 def do_shell(script):
-    # v0.15.0 (M3): опкод — точний збіг; старий ланцюжок підрядків нижче лишається запасним
-    # на один випуск (скрипти без AM_OP= — напр. з golden e2e_device.sh).
+    # Опкод — точний збіг; ланцюжок підрядків нижче лишається запасним для скриптів без
+    # AM_OP= (напр. з golden e2e_device.sh).
     opcode = parse_opcode(script)
     if opcode is not None:
         handler = OPCODE_HANDLERS.get(opcode)
@@ -587,26 +587,26 @@ def do_shell(script):
             sys.exit(2)
         handler(script)
         return
-    # v0.14.0: зонд ідентичності (сентинел-префікси, без AM_P=) — найперша гілка.
+    # Зонд ідентичності (сентинел-префікси, без AM_P=) — найперша гілка.
     if "__AM_ID__" in script:
         do_props()
         return
-    # Ці два маркери — ДО parse_am_p: скрипти рескану взагалі не містять AM_P=.
+    # Ці два маркери — до parse_am_p: скрипти рескану взагалі не містять AM_P=.
     if "MEDIA_SCANNER_SCAN_FILE" in script or "scan_volume" in script:
         do_rescan()
         return
-    # "stat -f" — ДО загальної гілки "__AM_NO_TOYBOX__" (обидва скрипти містять цей сентинел
+    # "stat -f" — до загальної гілки "__AM_NO_TOYBOX__" (обидва скрипти містять цей сентинел
     # у своєму тексті: маркер stat -f мусить перехопити запит першим).
     if "stat -f" in script:
         do_statfs(parse_am_p(script))
         return
-    # remoteExists (B1) — унікальний маркер __AM_ABSENT__ ДО всіх інших гілок: скрипт містить
+    # remoteExists — унікальний маркер __AM_ABSENT__ до всіх інших гілок: скрипт містить
     # і __AM_EXISTS__ (як moveRaw), тож розрізняти можна лише за __AM_ABSENT__.
     if "__AM_ABSENT__" in script:
         do_remote_exists(parse_am_p(script))
         return
     if script.startswith("for AM_P in "):
-        # v0.10.2/v0.11.0: батчеві скрипти без `AM_P=` на початку — ДО parse_am_p:
+        # Батчеві скрипти без `AM_P=` на початку — до parse_am_p:
         # deleteMany (rm -rf), removeEmptyDirectories (rmdir), checksumsMany (md5sum).
         items = parse_quoted_list(script[len("for AM_P in "):script.index("; do")])
         if "md5sum" in script:
@@ -618,7 +618,7 @@ def do_shell(script):
         return
     am_p = parse_am_p(script)
     if "md5sum" in script:
-        # v0.11.0: checksums(path) — містить і "-type f", тому ДО гілки recursiveFiles.
+        # checksums(path) — містить і "-type f", тому до гілки recursiveFiles.
         do_md5(am_p)
         return
     if "__AM_NO_TOYBOX__" in script:
@@ -628,7 +628,7 @@ def do_shell(script):
     elif "-type d" in script:
         do_dirs(am_p)
     elif "'%Y|%n'" in script:
-        # statMTimes (B1): той самий формат '%Y|%n', що recursiveDirs, але БЕЗ -type d/-type f
+        # statMTimes: той самий формат '%Y|%n', що recursiveDirs, але без -type d/-type f
         # (перевірено вище за чергою — обидві гілки з -type вже мали б перехопити свій випадок).
         do_stat_mtimes(am_p)
     elif "rm -rf" in script:
@@ -682,10 +682,10 @@ def truncate_half(path):
 
 
 def partial_copy_for_failure(local, dest):
-    """B2 (MOCK_PULL_FAIL_COUNT): емулює обрив з'єднання посеред `adb pull -a`. Для теки —
+    """MOCK_PULL_FAIL_COUNT: емулює обрив з'єднання посеред `adb pull -a`. Для теки —
     перший файл (за відносним шляхом, сортовано) лягає повністю, другий обрізається навпіл,
     решта взагалі не копіюється; для одиночного файла — сам файл обрізається навпіл. dest
-    лишається у ЧАСТКОВОМУ стані навмисно — саме це TransferEngine.resumeMissing() і мусить
+    лишається у частковому стані навмисно — саме це TransferEngine.resumeMissing() і мусить
     добрати наступним викликом.
     """
     if os.path.isdir(local) and not os.path.islink(local):
@@ -712,7 +712,7 @@ def partial_copy_for_failure(local, dest):
 
 
 def do_exec_out(words):
-    """4.1: `exec-out toybox head -c N 'path'` — перші N байтів файла байт-у-байт у stdout.
+    """`exec-out toybox head -c N 'path'` — перші N байтів файла байт-у-байт у stdout.
     Реальний adb склеює аргументи пробілами і віддає shell на телефоні, тому шлях приходить
     у POSIX-лапках — розбираємо shlex-ом, як зробив би sh."""
     import shlex
@@ -743,9 +743,9 @@ def do_pull(remote, local_dir):
     base = os.path.basename(local.rstrip("/"))
     dest = os.path.join(local_dir, base)
 
-    # v0.11.0: MOCK_GROW_ON_PULL_COUNT — перед копіюванням дописати 3 байти в ДЖЕРЕЛО (файл
+    # MOCK_GROW_ON_PULL_COUNT — перед копіюванням дописати 3 байти в джерело (файл
     # «дописується» на телефоні після лістингу → verify за розміром провалюється, доки рушій
-    # не перечитає розміри). MOCK_ADD_FILE_ON_PULL — створити ЧУЖИЙ файл у теці-джерелі
+    # не перечитає розміри). MOCK_ADD_FILE_ON_PULL — створити чужий файл у теці-джерелі
     # (з'явився під час переносу → безпечне видалення має лишити його і саму теку).
     if consume_counter("MOCK_GROW_ON_PULL_COUNT") and os.path.isfile(local):
         with open(local, "ab") as f:
@@ -761,7 +761,7 @@ def do_pull(remote, local_dir):
 
     if os.path.isdir(local) and not os.path.islink(local):
         shutil.copytree(local, dest, symlinks=True)
-        # Реальний `adb pull -a` зберігає mtime лише ФАЙЛІВ; теки отримують поточний час.
+        # Реальний `adb pull -a` зберігає mtime лише файлів; теки отримують поточний час.
         # Емулюємо, щоб тести ловили відновлення дат тек рушієм.
         os.utime(dest, None)
         for dirpath, dirnames, _f in os.walk(dest):
@@ -771,14 +771,14 @@ def do_pull(remote, local_dir):
         shutil.copy2(local, dest)
     if os.environ.get("MOCK_CORRUPT_PULL") == "1" or consume_counter("MOCK_CORRUPT_PULL_COUNT"):
         corrupt_first_file(dest)
-    # v0.11.0: той самий розмір, інший вміст — ловиться лише md5.
+    # Той самий розмір, інший вміст — ловиться лише md5.
     if consume_counter("MOCK_CORRUPT_CHECKSUM_COUNT"):
         flip_first_byte_keep_size(dest)
     print(f"{remote}: pulled")
 
 
 def do_wait_for_device():
-    """`adb -s SERIAL wait-for-device` (B2). За замовчуванням пристрій "готовий" одразу —
+    """`adb -s SERIAL wait-for-device`. За замовчуванням пристрій "готовий" одразу —
     MOCK_WAIT_HANG=1 емулює завислий обрив (тест скасування посеред очікування)."""
     if os.environ.get("MOCK_WAIT_HANG") == "1":
         time.sleep(30)
@@ -786,7 +786,7 @@ def do_wait_for_device():
 
 
 def do_push(local, remote):
-    """Емулює `adb -s SERIAL push LOCAL REMOTE` (B1). LOCAL — реальний шлях на Mac (НЕ
+    """Емулює `adb -s SERIAL push LOCAL REMOTE`. LOCAL — реальний шлях на Mac (не
     через translate — це не телефонний шлях), REMOTE — телефонний шлях (через translate).
     Як справжній adb push у наявну теку: копіює LOCAL всередину REMOTE під тим самим basename.
     """
@@ -803,7 +803,7 @@ def do_push(local, remote):
     base = os.path.basename(local.rstrip("/"))
     dest = os.path.join(remote_local, base) if os.path.isdir(remote_local) else remote_local
     os.makedirs(os.path.dirname(dest), exist_ok=True)
-    # v0.11.0 (P2): MOCK_PUSH_FAIL_COUNT=n — перші n push-ів кладуть ЧАСТКОВО (тека: перший
+    # MOCK_PUSH_FAIL_COUNT=n — перші n push-ів кладуть частково (тека: перший
     # файл цілий, другий обрізаний, решта — ні; файл — обрізаний) і exit 1 — обрив посеред push.
     if consume_counter("MOCK_PUSH_FAIL_COUNT"):
         if os.path.exists(dest):
@@ -831,7 +831,7 @@ def do_devices():
 
 
 def _track_frame_payload(state):
-    """Один рядок пристрою (той самий формат, що do_devices(), АЛЕ без -l/model — track-devices
+    """Один рядок пристрою (той самий формат, що do_devices(), але без -l/model — track-devices
     протокол моделі не передає) чи порожній payload, коли пристрою нема."""
     if not state or state == "none":
         return ""
@@ -839,8 +839,8 @@ def _track_frame_payload(state):
 
 
 def _write_track_frame(state):
-    """Друкує ОДИН кадр track-devices: 4 hex-символи довжини payload (нижній регістр, як
-    справжній adb) одразу перед самим payload, без роздільників і БЕЗ зайвого \\n після
+    """Друкує один кадр track-devices: 4 hex-символи довжини payload (нижній регістр, як
+    справжній adb) одразу перед самим payload, без роздільників і без зайвого \\n після
     довжини — payload сам несе свій завершальний \\n (чи порожній, коли пристрою нема)."""
     payload = _track_frame_payload(state)
     length_hex = format(len(payload.encode("utf-8")), "04x")
@@ -849,14 +849,14 @@ def _write_track_frame(state):
 
 
 def do_track_devices():
-    """Емулює `adb track-devices` (2.4, ProcessRunner.stream()): довгоживучий процес без
-    природного кінця, друкує новий кадр на КОЖНУ зміну підключення.
+    """Емулює `adb track-devices` (ProcessRunner.stream()): довгоживучий процес без
+    природного кінця, друкує новий кадр на кожну зміну підключення.
 
     Без MOCK_TRACK_FILE: один кадр за поточним MOCK_STATE, потім `sleep 1` і exit 0 —
     достатньо для тесту, що перевіряє лише перший кадр і швидко скасовує стрім.
 
     З MOCK_TRACK_FILE=<шлях>: перший кадр — за вмістом файлу (чи MOCK_STATE, якщо файл ще
-    не існує в момент старту); далі кожні 200 мс перечитує файл і при ЗМІНІ вмісту друкує
+    не існує в момент старту); далі кожні 200 мс перечитує файл і при зміні вмісту друкує
     новий кадр (тест "підключає"/"відключає" пристрій, переписуючи файл рядком
     device|unauthorized|offline|none) — завершується (exit 0), коли файл видалено.
     """
@@ -889,7 +889,7 @@ def main():
     args = sys.argv[1:]
     log_call(args)
 
-    # 1.6 (chaos-mock): рахуємо ЦЕЙ виклик у наскрізному лічильнику ДО будь-якого диспетчеру —
+    # Chaos-mock: рахуємо цей виклик у наскрізному лічильнику до будь-якого диспетчеру —
     # обрив мусить вдавати повний обрив adb-сервера, байдуже, яку саме команду клієнт саме
     # намагався виконати (shell/pull/push/devices/wait-for-device).
     call_index = call_index_and_increment()
@@ -910,7 +910,7 @@ def main():
         except ValueError:
             pass
 
-    # v0.14.0 (Wi-Fi): підкоманди adb (не shell) — mdns/pair/connect/disconnect.
+    # Підкоманди adb (не shell) — mdns/pair/connect/disconnect.
     if args[:2] == ["mdns", "check"]:
         if os.environ.get("MOCK_MDNS") == "1":
             print("mdns daemon version [libadbmdns]")
@@ -954,7 +954,7 @@ def main():
             do_exec_out(rest[1:])
             return
         if len(rest) >= 4 and rest[0] == "pull" and rest[1] == "-a":
-            # v0.10.2: `pull -a r1 … rN localDir` (батч) — як реальний adb: файли по черзі,
+            # `pull -a r1 … rN localDir` (батч) — як реальний adb: файли по черзі,
             # перша помилка (напр. MOCK_PULL_FAIL_COUNT) обриває решту з exit 1 — файли, що
             # встигли лягти, лишаються (TransferEngine+Batch добирає решту поштучно).
             local_dir = rest[-1]

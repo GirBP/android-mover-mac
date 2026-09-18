@@ -1,14 +1,13 @@
 import Foundation
 import AndroidMoverCore
 
-/// Аудит-фікс (файл ≤400 рядків): навігація по теках телефона, поллер листингу, обране
-/// (per-serial), персистенція сортування таблиці — винесено з BrowserStore.swift (той ліз за
-/// 400-рядкову межу після критичного/high-фіксів v0.10.2, п. index-race/isIndexBuilding/
-/// scheduleRefilter). Той самий патерн розбиття, що вже застосований до
+/// Навігація по теках телефона, поллер листингу, обране (per-serial), персистенція
+/// сортування таблиці — винесено з BrowserStore.swift, щоб той не переростав межу файлу в
+/// кілька сотень рядків. Той самий патерн розбиття, що вже застосований до
 /// BrowserView.swift/BrowserView+Toolbar.swift.
 ///
 /// `lastListedKey`/`listGeneration`/`sweptRemoteKeys`/`lastStorageInfoAt`/
-/// `lastKnownActiveSerial`/`pollTask` лишаються ОГОЛОШЕНІ (stored properties) у
+/// `lastKnownActiveSerial`/`pollTask` лишаються оголошені (stored properties) у
 /// BrowserStore.swift — Swift-екстеншени не можуть додавати stored-властивості — але
 /// звужені з `private` до звичайного (internal, видимого лише в межах модуля) доступу, щоб
 /// методи тут могли їх читати/писати; те саме зроблено з `loadSortOrder`/`persistSortOrder`
@@ -16,22 +15,21 @@ import AndroidMoverCore
 /// `sortOrder` і його didSet).
 extension BrowserStore {
     /// Скидає кеш "останній залістований ключ" — щоб наступний refreshList() не був пропущений
-    /// поллером як "нічого не змінилось". Викликається після transfer/push (2.1 переніс сюди
-    /// пряме `lastListedKey = nil`, яке раніше жило в AppState.startTransfer/requestPush).
+    /// поллером як "нічого не змінилось". Викликається після transfer/push.
     func invalidateListingCache() {
         lastListedKey = nil
     }
 
-    // MARK: - Поллер листингу (2.4: тригериться подією зміни пристрою від DeviceStore,
-    // сам більше не питає `adb devices` — лише читає вже оновлений DeviceStore.activeDevice)
+    // MARK: - Поллер листингу (тригериться подією зміни пристрою від DeviceStore, сам
+    // більше не питає `adb devices` — лише читає вже оновлений DeviceStore.activeDevice)
 
-    /// 2.2-фікс (той самий патерн, що DeviceStore.startTrackingIfNeeded): БЕЗ
-    /// `while let self` — той бинд тримав би СИЛЬНИЙ `self` на весь час тіла ітерації,
-    /// включно з `Task.sleep(2.5с)`, тобто `self` (і BrowserStore, і транзитивно все, що
-    /// він тримає) лишався б живим на весь сон, навіть коли вікно вже закрилось. Замість
-    /// цього `self` зв'язується в СИЛЬНИЙ локальний лише на момент застосування
-    /// (`if let self { await self.pollTick() }` — тіло if вужче за тіло while) — сон нижче
-    /// вже поза цим зв'язуванням, self звільняється до нього.
+    /// Той самий патерн, що DeviceStore.startTrackingIfNeeded: без `while let self` — той
+    /// бинд тримав би сильний `self` на весь час тіла ітерації, включно з `Task.sleep(2.5с)`,
+    /// тобто `self` (і BrowserStore, і транзитивно все, що він тримає) лишався б живим на
+    /// весь сон, навіть коли вікно вже закрилось. Замість цього `self` зв'язується в сильний
+    /// локальний лише на момент застосування (`if let self { await self.pollTick() }` — тіло
+    /// if вужче за тіло while) — сон нижче вже поза цим зв'язуванням, self звільняється до
+    /// нього.
     func startPolling() {
         guard pollTask == nil else { return }
         pollTask = Task { [weak self] in
@@ -55,8 +53,7 @@ extension BrowserStore {
         await refreshStorageInfo(force: false)
     }
 
-    /// DeviceStore.onDeviceSelected — миттєвий повний скид без очікування поллера (та сама
-    /// поведінка, що раніше була в AppState.selectDevice()).
+    /// DeviceStore.onDeviceSelected — миттєвий повний скид без очікування поллера.
     func deviceWasExplicitlySelected() {
         listGeneration += 1
         isLoading = false
@@ -72,16 +69,15 @@ extension BrowserStore {
         lastFavoritesKey = lastKnownActiveSerial.map { favoritesKey(for: $0) }
     }
 
-    /// DeviceStore.onDevicesUpdated — та сама інвалідація, що раніше жила у кінці
-    /// AppState.refreshDevicesQuietly(). 3.1: обране теж перечитується тут — це єдине
-    /// місце, що ловить і автоматичне перепідключення (не лише явний вибір користувача вище).
+    /// DeviceStore.onDevicesUpdated. Обране теж перечитується тут — це єдине місце, що
+    /// ловить і автоматичне перепідключення (не лише явний вибір користувача вище).
     func devicesContextDidChange(activeSerial: String?, isEmpty: Bool) {
         if isEmpty { lastListedKey = nil }
         if activeSerial != lastKnownActiveSerial {
             storageInfo = nil
             lastStorageInfoAt = nil
         }
-        // v0.14.0: обране ключоване стабільною ідентичністю — перечитати і при зміні serial, і коли
+        // Обране ключоване стабільною ідентичністю — перечитати і при зміні serial, і коли
         // ідентичність того самого serial щойно резолвилась.
         let key = activeSerial.map { favoritesKey(for: $0) }
         if activeSerial != lastKnownActiveSerial || key != lastFavoritesKey {
@@ -91,9 +87,9 @@ extension BrowserStore {
         lastKnownActiveSerial = activeSerial
     }
 
-    // MARK: - 3.1: обране на телефоні (per-serial UserDefaults)
+    // MARK: - Обране на телефоні (per-serial UserDefaults)
 
-    /// v0.14.0: ключ за стабільною ідентичністю (`android_id|serial`), не за adb-serial — той самий
+    /// Ключ за стабільною ідентичністю (`android_id|serial`), не за adb-serial — той самий
     /// телефон по USB і по Wi-Fi має одне обране; адреса `ip:port` після перезавантаження інша.
     private func favoritesKey(for serial: String) -> String { "phoneFavorites.\(deviceStore.stableID(for: serial))" }
 
@@ -101,7 +97,7 @@ extension BrowserStore {
         guard let serial else { return [] }
         let key = favoritesKey(for: serial)
         if let saved = UserDefaults.standard.stringArray(forKey: key) { return saved }
-        // Одноразова міграція зі старого ключа за serial (v0.10–v0.13).
+        // Одноразова міграція зі старого ключа за serial.
         let legacyKey = "phoneFavorites.\(serial)"
         if legacyKey != key, let legacy = UserDefaults.standard.stringArray(forKey: legacyKey) {
             UserDefaults.standard.set(legacy, forKey: key)
@@ -110,9 +106,9 @@ extension BrowserStore {
         return []
     }
 
-    /// Додає ПОТОЧНУ відкриту теку в обране активного пристрою — виклик і з кнопки "+" у
+    /// Додає поточну відкриту теку в обране активного пристрою — виклик і з кнопки "+" у
     /// сайдбарі, і з контекстного меню "Додати в обране" на breadcrumb-рядку.
-    /// v0.10.2: чи є сенс додавати поточну теку в обране (є пристрій, не швидке місце, ще не в
+    /// Чи є сенс додавати поточну теку в обране (є пристрій, не швидке місце, ще не в
     /// обраному) — сайдбар вимикає «+» і пояснює чому, замість мовчазного «нічого не сталось».
     var canAddCurrentPathToFavorites: Bool {
         deviceStore.activeDevice != nil
@@ -132,7 +128,7 @@ extension BrowserStore {
         UserDefaults.standard.set(favorites, forKey: favoritesKey(for: serial))
     }
 
-    // MARK: - 3.8: персистенція сортування таблиці
+    // MARK: - Персистенція сортування таблиці
 
     private static let sortFieldKey = "browser.sortField"
     private static let sortAscendingKey = "browser.sortAscending"
@@ -167,7 +163,7 @@ extension BrowserStore {
     // MARK: - Навігація
 
     func navigate(to path: String) async {
-        // v0.10.2: клік по вже відкритій теці (швидке місце, обране, крихта) — не скидати
+        // Клік по вже відкритій теці (швидке місце, обране, крихта) — не скидати
         // пошук і виділення; для примусового перечитування є «Оновити» (⌘R).
         guard RemotePath.normalized(path) != currentPath else { return }
         currentPath = RemotePath.normalized(path)
@@ -210,9 +206,9 @@ extension BrowserStore {
         isLoading = false
     }
 
-    /// 1.5: fire-and-forget sweep сиріт (.androidmover-tmp-*) на телефоні — рівно раз на
+    /// Fire-and-forget sweep сиріт (.androidmover-tmp-*) на телефоні — рівно раз на
     /// serial|path за сесію (сесія — час життя BrowserStore, не окремого запуску-полінгу), лише
-    /// після УСПІШНОГО лістингу. Ніколи не блокує UI і не показує помилку — best-effort.
+    /// після успішного лістингу. Ніколи не блокує UI і не показує помилку — best-effort.
     private func sweepRemoteOrphansIfNeeded(dir: String, client: ADBClient, serial: String) {
         let key = "\(serial)|\(dir)"
         guard !sweptRemoteKeys.contains(key) else { return }
@@ -239,7 +235,7 @@ extension BrowserStore {
         storageInfo = info
     }
 
-    /// v0.10.1: `index.byID[id]` — O(1) замість `entries.first(where:)` (O(n) на клік).
+    /// `index.byID[id]` — O(1) замість `entries.first(where:)` (O(n) на клік).
     func openIfSingleDirectory(_ ids: Set<String>) {
         guard ids.count == 1, let id = ids.first,
               let entry = index.byID[id],

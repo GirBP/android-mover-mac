@@ -2,12 +2,12 @@ import SwiftUI
 import AndroidMoverCore
 
 extension Notification.Name {
-    /// v0.10.2: історію очистили (Settings) — відкритий HistoryView перечитує список.
+    /// Історію очистили (Settings) — відкритий HistoryView перечитує список.
     static let androidMoverHistoryDidChange = Notification.Name("ua.bibo.android-mover.historyDidChange")
 }
 
-/// «Історія…» (A5) — sheet у стилі TransferSheet: список recent-записів, розгортання
-/// рядка показує елементи операції, «Показати у Finder» для тих, що досі є на диску.
+/// «Історія…» — sheet у стилі TransferSheet: список recent-записів, розгортання рядка
+/// показує елементи операції, «Показати у Finder» для тих, що досі є на диску.
 struct HistoryView: View {
     let state: AppState
 
@@ -47,7 +47,7 @@ struct HistoryView: View {
         }
         .frame(width: 520, height: 440)
         .onAppear { reload() }
-        // v0.10.2: очищення історії з Settings (⌘,) оновлює вже відкритий список.
+        // Очищення історії з Settings (⌘,) оновлює вже відкритий список.
         .onReceive(NotificationCenter.default.publisher(for: .androidMoverHistoryDidChange)) { _ in reload() }
         .confirmationDialog(
             "Очистити всю історію операцій?",
@@ -87,7 +87,7 @@ struct HistoryView: View {
             .padding(.top, 4)
         } label: {
             recordLabel(record)
-                // v0.10.2: клік по всьому рядку розгортає, не лише по трикутнику.
+                // Клік по всьому рядку розгортає, не лише по трикутнику.
                 .contentShape(Rectangle())
                 .onTapGesture {
                     if expandedIDs.contains(record.id) { expandedIDs.remove(record.id) } else { expandedIDs.insert(record.id) }

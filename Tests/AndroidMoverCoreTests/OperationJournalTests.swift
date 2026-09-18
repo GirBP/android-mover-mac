@@ -65,7 +65,7 @@ final class OperationJournalTests: XCTestCase {
         XCTAssertEqual(journal.unfinished().count, 1)
     }
 
-    /// v0.14.0: стабільна ідентичність у записі; старий JSON без поля декодується з nil.
+    /// Стабільна ідентичність у записі; старий JSON без поля декодується з nil.
     func testDeviceStableIDRoundTripAndLegacyDecode() throws {
         let (journal, _) = makeJournal()
         var rec = record()

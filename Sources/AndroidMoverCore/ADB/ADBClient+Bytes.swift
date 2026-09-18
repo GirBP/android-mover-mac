@@ -1,7 +1,6 @@
 import Foundation
 
 /// Байти й контрольні суми: перші байти файла (мініатюри), md5, батчевий pull, push.
-/// v0.15.0 (M3): частина колишнього ADBClient+FileOps.swift (411 рядків → три файли).
 extension ADBClient {
     /// Скільки шляхів іде в один батчевий `pull`/`rm` — 32 вкладаються в ARG_MAX з великим
     /// запасом навіть для довгих кириличних шляхів, а накладні спавну adb діляться на 32.
@@ -13,9 +12,9 @@ extension ADBClient {
     /// 8 ГБ відео може не давати виводу кілька хвилин.
     public static let checksumTimeout: TimeInterval = 1800
 
-    // MARK: - Перші байти файла (4.1: мініатюри)
+    // MARK: - Перші байти файла (мініатюри)
 
-    /// Перші `bytes` байтів файла БЕЗ стягування цілого: `adb exec-out` віддає stdout команди
+    /// Перші `bytes` байтів файла без стягування цілого: `adb exec-out` віддає stdout команди
     /// байт-у-байт (на відміну від `shell`, що перекодовує \n). Шлях у POSIX-лапках, бо exec-out
     /// іде через shell телефона.
     public func readHead(_ path: String, bytes: Int, on serial: String) async throws -> Data {
@@ -29,7 +28,7 @@ extension ADBClient {
         return result.stdout
     }
 
-    // MARK: - Контрольні суми (v0.11.0, P1)
+    // MARK: - Контрольні суми
 
     /// md5 файлів під `path`: файл → один рядок, тека → рекурсивно (`find -type f -exec md5sum +`,
     /// батчинг ARG_MAX — усередині find). Повертає remotePath → hex (шлях — сирі байти телефона).
@@ -47,7 +46,7 @@ extension ADBClient {
         return Self.parseMD5Sums(result.out)
     }
 
-    /// md5 кількох ПЛОСКИХ файлів одним `adb shell` (батч ≤batchSize) — для батчевого шляху.
+    /// md5 кількох плоских файлів одним `adb shell` (батч ≤batchSize) — для батчевого шляху.
     public func checksumsMany(
         _ paths: [String],
         on serial: String,
@@ -78,7 +77,7 @@ extension ADBClient {
         return map
     }
 
-    // MARK: - Батчі (v0.10.2) і push
+    // MARK: - Батчі і push
 
     /// `adb pull -a p1 … pN localDir` — один процес на батч замість одного на файл. Семантика як у
     /// `pull`: кожен файл лягає як `localDir/<basename>`; помилка будь-якого — exit ≠ 0, і викликач

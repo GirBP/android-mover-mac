@@ -1,13 +1,13 @@
 import Foundation
 
-/// Аудит-знахідка (спринт 3С, п.6): дочірні adb-процеси (`posix_spawn`-жені, напр.
-/// `adb track-devices`) НЕ гинуть разом із батьком на SIGTERM/SIGINT/kill — стандартна Unix-
-/// поведінка, сигнал батькові НЕ каскадується автоматично на дітей, вони репарентяться до
-/// launchd і лишаються сиротами (підтверджено емпірично: `ps aux` після смоук-тесту
-/// `build_app.sh`, що вбиває головний процес, показував живий `adb track-devices`).
+/// Дочірні adb-процеси (`posix_spawn`-жені, напр. `adb track-devices`) не гинуть разом із
+/// батьком на SIGTERM/SIGINT/kill — стандартна Unix-поведінка, сигнал батькові не
+/// каскадується автоматично на дітей, вони репарентяться до launchd і лишаються сиротами
+/// (підтверджено емпірично: `ps aux` після смоук-тесту `build_app.sh`, що вбиває головний
+/// процес, показував живий `adb track-devices`).
 ///
-/// Реєстр УСІХ живих `ChildProcess` — бекстоп на такий випадок: `ProcessRunner.spawnChild`
-/// реєструє кожну щойно спороджену дитину ТУТ (єдина точка спавну для `run()` і `stream()`),
+/// Реєстр усіх живих `ChildProcess` — бекстоп на такий випадок: `ProcessRunner.spawnChild`
+/// реєструє кожну щойно спороджену дитину тут (єдина точка спавну для `run()` і `stream()`),
 /// `ChildProcess.markReaped` знімає її звідси сама (реап — природний кінець життя процесу,
 /// більше нема чого термінувати). `ProcessRunner.terminateAllChildren()` — публічний вхід для
 /// App-таргету (AppDelegate: SIGTERM/SIGINT-обробник і `applicationWillTerminate`) — ескалює
@@ -38,7 +38,7 @@ final class ChildProcessRegistry: @unchecked Sendable {
         entries.removeValue(forKey: ObjectIdentifier(process))
     }
 
-    /// Ескалація для КОЖНОГО досі живого зареєстрованого процесу — `terminateWithEscalation()`
+    /// Ескалація для кожного досі живого зареєстрованого процесу — `terminateWithEscalation()`
     /// сам ідемпотентний (лічильник під lock, per-процес, той самий шлях, яким іде звичайне
     /// «Скасувати»/idle-таймаут), тож безпечно кликати кілька разів (SIGTERM-обробник і
     /// `applicationWillTerminate` теоретично можуть спрацювати обидва).

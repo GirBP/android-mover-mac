@@ -4,7 +4,7 @@ import XCTest
 
 extension EngineTests {
 
-    // MARK: - B1: push Mac → Android
+    // MARK: - push Mac → Android
 
     func testRemoteExists() async throws {
         let client = makeClient()
@@ -112,7 +112,7 @@ extension EngineTests {
         }
         XCTAssertTrue(message.contains("не збігається") || message.contains("Перевірка копії"), "повідомлення: \(message)")
 
-        // У видимій теці елемента НЕМА.
+        // У видимій теці елемента нема.
         XCTAssertFalse(fm.fileExists(atPath: phoneRoot.appendingPathComponent("Download/зіпсований.bin").path))
         // tmp прибраний.
         let leftovers = try fm.contentsOfDirectory(atPath: phoneRoot.appendingPathComponent("Download").path)

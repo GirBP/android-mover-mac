@@ -1,8 +1,8 @@
 import SwiftUI
 import AndroidMoverCore
 
-/// 3.4: гарячі клавіші через `.commands` у App.swift. Кожне вікно (⌘N) має власний AppState —
-/// команди читають стан АКТИВНОГО вікна через `@FocusedValue` (не `@Environment`, який дав би
+/// Гарячі клавіші через `.commands` у App.swift. Кожне вікно (⌘N) має власний AppState —
+/// команди читають стан активного вікна через `@FocusedValue` (не `@Environment`, який дав би
 /// один спільний екземпляр): RootView публікує `.focusedSceneValue(\.appState, state)` на
 /// себе, тож при перемиканні між вікнами (⌘~/клік) `appState` тут автоматично вказує на
 /// сховища саме того вікна, що зараз активне.
@@ -10,7 +10,7 @@ private struct AppStateFocusedValueKey: FocusedValueKey {
     typealias Value = AppState
 }
 
-/// Дії, яким потрібен ЛОКАЛЬНИЙ UI-стан BrowserView (фокус пошуку, перемикач шлях↔TextField,
+/// Дії, яким потрібен локальний UI-стан BrowserView (фокус пошуку, перемикач шлях↔TextField,
 /// відкриття fileImporter-а push) — не частина AppState (сховища), тому окремий
 /// focused-value, публікується лише поки BrowserView видима (детейл у stage == .ready).
 /// nil, коли активне вікно показує OnboardingView — відповідні пункти меню самі задизейбляться.
@@ -35,7 +35,7 @@ extension FocusedValues {
     }
 }
 
-/// `.disabled` тут дзеркалить ТІ САМІ умови, що відповідні кнопки в BrowserView/toolbar —
+/// `.disabled` тут дзеркалить ті самі умови, що відповідні кнопки в BrowserView/toolbar —
 /// жодної нової логіки, лише альтернативний вхід до тих самих методів сховищ.
 struct AppCommands: Commands {
     @FocusedValue(\.appState) private var appState
@@ -45,10 +45,9 @@ struct AppCommands: Commands {
         CommandGroup(after: .newItem) {
             Divider()
 
-            // Аудит-фікс (критично, п.2): БУВ ⌘C (без Shift) — перехоплював системний Copy в
-            // КОЖНОМУ TextField (пошук, шлях, перейменування): виділення тексту й ⌘C для
-            // копіювання в буфер обміну натомість стартували трансфер файлів. ⌘C лишається
-            // системним, тут не чіпаємо; наш шорткат — ⌘⇧C.
+            // ⌘C лишається системним клавіатурним скороченням копіювання в буфер
+            // обміну — і в текстових полях (пошук, шлях, перейменування) теж; тут не
+            // чіпаємо, наше скорочення — ⌘⇧C.
             Button("Копіювати на Mac") {
                 appState?.transfers.requestTransfer(move: false)
             }
@@ -67,12 +66,11 @@ struct AppCommands: Commands {
             .keyboardShortcut("u", modifiers: [.command, .shift])
             .disabled(browserUI == nil || !(appState?.transfers.canPush ?? false))
 
-            // Аудит-фікс (high, п.3): БУВ голий ⌫ (без модифікатора) — перехоплював Backspace
-            // у КОЖНОМУ TextField (пошук/шлях/перейменування): звичайне стирання символу
-            // натомість відкривало підтвердження видалення з телефона. ⌘⌫ — як «Move to
-            // Trash» у Finder. Аудит-фікс (п.4): visibleSelection, не голий selection —
-            // приховане тумблером/фільтром ніколи не потрапляє в підтвердження видалення
-            // (FileActions.requestDelete теж додатково валідує це саме, другий бар'єр).
+            // Скорочення — ⌘⌫, як «Move to Trash» у Finder, не голий ⌫ (той стирає символ
+            // у текстових полях пошуку/шляху/перейменування). visibleSelection, не голий
+            // selection — приховане тумблером/фільтром ніколи не потрапляє в підтвердження
+            // видалення (FileActions.requestDelete теж додатково валідує це саме, другий
+            // бар'єр).
             Button("Видалити з телефона…") {
                 guard let appState else { return }
                 appState.files.requestDelete(appState.browser.visibleSelection)

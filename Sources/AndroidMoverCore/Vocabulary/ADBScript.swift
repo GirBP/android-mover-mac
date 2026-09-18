@@ -3,7 +3,7 @@ import Foundation
 /// Закритий словник усіх shell-скриптів, які застосунок
 /// відправляє на телефон. Кожен скрипт починається з `AM_OP=<опкод>;` — mock диспетчить за ним
 /// точним збігом (не підрядками у фіксованому порядку), контракт (`ADBContract`) і golden-транскрипти
-/// звіряються за опкодом. Тіла скриптів — дослівно ті, що були в ADBClient до v0.15.0.
+/// звіряються за опкодом.
 public enum ADBOpcode: String, CaseIterable, Codable, Sendable {
     case listDir, findFiles, findDirs, statMTimes, statFS
     case md5One, md5Batch
@@ -46,7 +46,7 @@ public struct ADBScript: Sendable, Equatable {
     }
 }
 
-/// Фабрики — одна на опкод. Шляхи приходять УЖЕ нормалізовані (`RemotePath.normalized`),
+/// Фабрики — одна на опкод. Шляхи приходять уже нормалізовані (`RemotePath.normalized`),
 /// квотинг — лише тут, через `RemotePath.shellQuote` (unicode-скалярний).
 public enum ADBScripts {
     private static func make(_ opcode: ADBOpcode, _ body: String, _ sentinels: Set<ADBSentinel>) -> ADBScript {

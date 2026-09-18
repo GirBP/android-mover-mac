@@ -1,21 +1,21 @@
 import SwiftUI
 import AndroidMoverCore
 
-/// Аудит-фікс (п.5а, п.6): чистий SwiftUI `App`-lifecycle не дає гачків ані на "вихід із
-/// додатка" (⌘Q/меню — щоб спитати підтвердження, коли черга операцій ще не порожня), ані на
-/// SIGTERM/SIGINT (`kill`, Ctrl-C з термінала — щоб устигнути вбити дочірні adb-процеси перед
-/// смертю самого додатка). Обидва потребують справжнього `NSApplicationDelegate` —
-/// підключається через `@NSApplicationDelegateAdaptor` в App.swift.
+/// Чистий SwiftUI `App`-lifecycle не дає гачків ані на "вихід із додатка" (⌘Q/меню — щоб
+/// спитати підтвердження, коли черга операцій ще не порожня), ані на SIGTERM/SIGINT (`kill`,
+/// Ctrl-C з термінала — щоб устигнути вбити дочірні adb-процеси перед смертю самого додатка).
+/// Обидва потребують справжнього `NSApplicationDelegate` — підключається через
+/// `@NSApplicationDelegateAdaptor` в App.swift.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Тримає `DispatchSourceSignal`-и живими на весь час роботи додатка — без сильного
     /// посилання ARC звільнив би джерело одразу по виході з `installSignalHandler`, знявши
     /// обробник (джерело саме по собі не тримає себе живим).
     private nonisolated(unsafe) static var signalSources: [DispatchSourceSignal] = []
 
-    // MARK: - 5а: підтвердження виходу з додатка (⌘Q/меню), коли черга ще не порожня
+    // MARK: - Підтвердження виходу з додатка (⌘Q/меню), коли черга ще не порожня
 
-    /// Перевіряє чергу КОЖНОГО вікна (`TransferCoordinator.live`, реєстр слабких посилань —
-    /// TransferCoordinator.swift), не лише активного — вихід з додатка стосується ВСІХ вікон
+    /// Перевіряє чергу кожного вікна (`TransferCoordinator.live`, реєстр слабких посилань —
+    /// TransferCoordinator.swift), не лише активного — вихід з додатка стосується всіх вікон
     /// одразу.
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         let busy = TransferCoordinator.live.allObjects.filter { $0.hasQueueWork }
@@ -24,7 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let alert = NSAlert()
         alert.messageText = String(localized: "Операція триває — скасувати і вийти?")
         alert.informativeText = String(localized: "У черзі є незавершене перенесення чи push. Вихід скасує їх — телефон нічого не видаляє без підтвердженої копії.")
-        // v0.10.2: Enter/default — безпечна дія («Продовжити роботу»), деструктивна — друга.
+        // Enter/default — безпечна дія («Продовжити роботу»), деструктивна — друга.
         alert.addButton(withTitle: String(localized: "Продовжити роботу"))
         let quitButton = alert.addButton(withTitle: String(localized: "Скасувати і вийти"))
         quitButton.hasDestructiveAction = true
@@ -35,16 +35,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         return .terminateNow
     }
 
-    // MARK: - 6: SIGTERM/SIGINT — прибрати дочірні adb-процеси перед смертю додатка
+    // MARK: - SIGTERM/SIGINT — прибрати дочірні adb-процеси перед смертю додатка
 
     /// `kill <pid>` (SIGTERM) чи Ctrl-C в терміналі (SIGINT) за замовчуванням убивають процес
-    /// БЕЗ жодного шансу прибрати за собою — дочірні `posix_spawn`-жені adb-процеси (напр.
-    /// `adb track-devices`, DeviceStore) НЕ гинуть разом (репарентяться до launchd, звичайна
+    /// без жодного шансу прибрати за собою — дочірні `posix_spawn`-жені adb-процеси (напр.
+    /// `adb track-devices`, DeviceStore) не гинуть разом (репарентяться до launchd, звичайна
     /// Unix-поведінка). Ігноруємо default disposition (`signal(sig, SIG_IGN)`) і слухаємо сам
     /// сигнал через `DispatchSource` (GCD-рекомендований спосіб — обробник виконується як
     /// звичайний код на `.main`, а не в обмеженому async-signal-safe контексті класичного
     /// POSIX signal-handler'а): термінуємо все зареєстроване (`ProcessRunner.
-    /// terminateAllChildren()`, ChildProcessRegistry у Core) і ЛИШЕ ПОТІМ віддаємо керування
+    /// terminateAllChildren()`, ChildProcessRegistry у Core) і лише потім віддаємо керування
     /// звичайному `NSApp.terminate` (який іде крізь applicationShouldTerminate/
     /// applicationWillTerminate вище/нижче як завжди — тобто підтвердження виходу спрацює й
     /// тут, якщо є активна операція).
@@ -58,7 +58,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let source = DispatchSource.makeSignalSource(signal: sig, queue: .main)
         source.setEventHandler {
             ProcessRunner.terminateAllChildren()
-            // MainActor.assumeIsolated: обробник ГАРАНТОВАНО виконується на main queue
+            // MainActor.assumeIsolated: обробник гарантовано виконується на main queue
             // (queue: .main вище), але `setEventHandler` типізований як звичайний
             // неізольований `() -> Void` — компілятор цього не знає. assumeIsolated —
             // стандартний спосіб сказати "я вже на MainActor" без async-стрибка (впав би,

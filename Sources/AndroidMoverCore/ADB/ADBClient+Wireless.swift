@@ -19,9 +19,9 @@ public struct MDNSService: Sendable, Hashable {
     }
 }
 
-/// v0.14.0 (Wi-Fi): ідентичність телефона й бездротове налагодження. `pair`/`connect`/`mdns` —
-/// підкоманди самого adb (НЕ shell-скрипти), тому їхній вивід розбирається толерантно: між
-/// версіями platform-tools текст пливе, стабільні лише ключові фрази.
+/// Ідентичність телефона й бездротове налагодження. `pair`/`connect`/`mdns` — підкоманди
+/// самого adb, не shell-скрипти, тому їхній вивід розбирається толерантно: між версіями
+/// platform-tools текст пливе, стабільні лише ключові фрази.
 extension ADBClient {
     static let wirelessTimeout: TimeInterval = 30
 
@@ -106,7 +106,7 @@ extension ADBClient {
         }
     }
 
-    /// `adb connect host:port` — порт для під'єднання ІНШИЙ, ніж для спарювання (обидва на екрані
+    /// `adb connect host:port` — порт для під'єднання інший, ніж для спарювання (обидва на екрані
     /// «Бездротове налагодження»). Повертає serial, яким телефон з'явиться в `track-devices`.
     @discardableResult
     public func connect(host: String, port: Int) async throws -> String {

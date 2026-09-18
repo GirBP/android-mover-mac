@@ -1,7 +1,7 @@
 import SwiftUI
 import AndroidMoverCore
 
-/// 3.1: ліва колонка `NavigationSplitView` — три секції: "Пристрій" (усі підключені пристрої +
+/// Ліва колонка `NavigationSplitView` — три секції: "Пристрій" (усі підключені пристрої +
 /// вільне місце активного), "Телефон" (швидкі місця + обране, лише коли stage == .ready) і
 /// "Mac" (кілька збережених тек призначення). У не-ready станах (onboarding у detail) показує
 /// лише "Mac" + порожню "Пристрій" з підказкою — секція "Телефон" без активного пристрою не має
@@ -49,7 +49,7 @@ struct SidebarView: View {
                     storageInfoRow(info)
                 }
             }
-            // v0.14.0: Wi-Fi без кабеля — завжди доступно, і без жодного пристрою теж.
+            // Wi-Fi без кабеля — завжди доступно, і без жодного пристрою теж.
             Button {
                 showingWireless = true
             } label: {
@@ -118,11 +118,11 @@ struct SidebarView: View {
 
     // MARK: - Телефон (швидкі місця + обране)
 
-    /// v0.10.2: ОКРЕМІ простори id для швидких місць і обраного. Раніше обидва ForEach у тій
-    /// самій List-секції використовували голий шлях як id — коли користувач додавав у обране
-    /// теку, що збігається зі швидким місцем (/sdcard/Download), NSOutlineView отримував два
-    /// рядки з однаковим ідентифікатором і плутав їх (швидке місце «Завантаження» раптом
-    /// малювалось як «★ Download», обране — як тека без зірки).
+    /// Окремі простори id для швидких місць і обраного: спільний голий шлях як id у двох
+    /// ForEach тієї самої List-секції означав би, що додавання в обране теки, яка збігається
+    /// зі швидким місцем (/sdcard/Download), дає NSOutlineView два рядки з однаковим
+    /// ідентифікатором — швидке місце «Завантаження» малювалось би як «★ Download», обране —
+    /// як тека без зірки.
     private struct SidebarRowID: Identifiable {
         let path: String
         let scope: String
@@ -147,8 +147,8 @@ struct SidebarView: View {
                     Image(systemName: "plus.circle")
                 }
                 .buttonStyle(.plain)
-                // v0.10.2: неактивно, коли поточна тека — швидке місце чи вже в обраному
-                // (замість мовчазного «нічого не сталось»).
+                // Неактивно, коли поточна тека — швидке місце чи вже в обраному (замість
+                // мовчазного «нічого не сталось»).
                 .disabled(!state.browser.canAddCurrentPathToFavorites)
                 .help(state.browser.canAddCurrentPathToFavorites
                       ? "Додати поточну теку в обране (⌘⇧A)"
@@ -212,7 +212,7 @@ struct SidebarView: View {
     // MARK: - Mac (теки призначення)
 
     private var macSection: some View {
-        // v0.10.3: заголовок пояснює роль секції — це теки, КУДИ копіювати з телефона.
+        // Заголовок пояснює роль секції — це теки, куди копіювати з телефона.
         Section("Mac — куди копіювати") {
             ForEach(state.transfers.destinations, id: \.path) { url in
                 destinationRow(url)
@@ -227,7 +227,7 @@ struct SidebarView: View {
         // Дроп теки з Finder прямо в sidebar — додає її у список і робить активною (B1-подібна
         // Transferable-семантика URL, той самий підхід, що вже є в table push-дропі).
         .dropDestination(for: URL.self) { urls, _ in
-            // v0.10.2: усі кинуті теки, не лише перша; файли (не теки) тихо пропускаються.
+            // Усі кинуті теки, не лише перша; файли (не теки) тихо пропускаються.
             let folders = urls.filter { url in
                 var isDirectory: ObjCBool = false
                 return FileManager.default.fileExists(atPath: url.path, isDirectory: &isDirectory) && isDirectory.boolValue
@@ -254,7 +254,7 @@ struct SidebarView: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .truncationMode(.middle)
-                    // v0.10.3: диск від'єднано / лише читання — видно одразу, не після провалу.
+                    // Диск від'єднано / лише читання — видно одразу, не після провалу.
                     if let problem = state.transfers.cachedProblem(for: url) {
                         Label(problem, systemImage: "exclamationmark.triangle.fill")
                             .font(.caption2)

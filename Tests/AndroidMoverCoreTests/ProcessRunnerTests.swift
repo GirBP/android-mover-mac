@@ -4,25 +4,25 @@ import XCTest
 
 /// Тести самого ProcessRunner (posix_spawn-рушій, не adb/mock) — окремо від EngineTests, які
 /// перевіряють поведінку крізь ADBClient/mock_adb.py. Головне тут: байт-у-байт передача
-/// аргументів і оточення (корінь фіксу v0.9.2 — Foundation.Process на Darwin мовчки NFD-
-/// декомпонує "й"/"ї"/"é" тощо через fileSystemRepresentation, посилаючи дитині "и"+U+0306
-/// замість "й"), коректний exitCode/stderr, ідле-таймаут, що й справді вбиває процес, чесна
-/// помилка на неіснучому виконуваному файлі і скасування через onSpawn (той самий гачок, яким
-/// TransferEngine/PushEngine/RemoteFileTransfer реалізують cancel()).
+/// аргументів і оточення (`Foundation.Process` на Darwin мовчки NFD-декомпонує "й"/"ї"/"é"
+/// тощо через fileSystemRepresentation, посилаючи дитині "и"+U+0306 замість "й", а
+/// ProcessRunner — ні), коректний exitCode/stderr, ідле-таймаут, що й справді вбиває процес,
+/// чесна помилка на неіснучому виконуваному файлі і скасування через onSpawn (той самий
+/// гачок, яким TransferEngine/PushEngine/RemoteFileTransfer реалізують cancel()).
 final class ProcessRunnerTests: XCTestCase {
 
-    /// U+0439 CYRILLIC SMALL LETTER SHORT I, ПРЕКОМПОНОВАНА форма ("й" одним кодпойнтом) —
-    /// саме той символ, що фазз-тест 1.7 (EngineTests.FuzzNames) свідомо виключає з алфавіту
-    /// через цей самий баг. Явний `\u{0439}` замість друкованого літерала в коді — гарантія, що
-    /// джерело тесту само не проковтнуло якусь редакторську нормалізацію.
+    /// U+0439 CYRILLIC SMALL LETTER SHORT I, прекомпонована форма ("й" одним кодпойнтом) —
+    /// саме той символ, що фазз-тест EngineTests.FuzzNames свідомо виключає з алфавіту через
+    /// цей самий ризик нормалізації. Явний `\u{0439}` замість друкованого літерала в коді —
+    /// гарантія, що джерело тесту само не проковтнуло якусь редакторську нормалізацію.
     private static let precomposedI = "\u{0439}"
 
     // MARK: - Байт-у-байт аргументи й оточення
 
     func testArgumentsArePassedByteExact() async throws {
-        // /bin/sh -c 'printf %s "$1" | xxd -p' _ "й" → дитина мусить надрукувати РІВНО d0b9
+        // /bin/sh -c 'printf %s "$1" | xxd -p' _ "й" → дитина мусить надрукувати рівно d0b9
         // (UTF-8 прекомпонованого U+0439), не d0b8cc86 (и+U+0306 — НФД-декомпозиція, якою
-        // страждав старий Foundation.Process-рушій).
+        // страждає `Foundation.Process`).
         let result = try await ProcessRunner.run(
             executable: "/bin/sh",
             arguments: ["-c", "printf %s \"$1\" | xxd -p", "_", Self.precomposedI]
@@ -130,10 +130,10 @@ final class ProcessRunnerTests: XCTestCase {
 
     // MARK: - Сигнали після reap — no-op (PID міг бути перевикористаний ядром)
 
-    /// Аудит-знахідка: terminate()/forceKill() без перевірки `reaped` слали б kill(pid, ...) і
-    /// ПІСЛЯ того, як ProcessRunner уже зробив власний waitpid — а до цього моменту `pid`
-    /// (число) могло встигнути перевикористатись ядром для ЗОВСІМ ІНШОГО процесу (вузьке
-    /// мікровікно між markReaped у ProcessRunner і `currentProcess.value = nil` у
+    /// Без перевірки `reaped` terminate()/forceKill() слали б kill(pid, ...) і після того, як
+    /// ProcessRunner уже зробив власний waitpid — а до цього моменту `pid` (число) могло
+    /// встигнути перевикористатись ядром для зовсім іншого процесу (вузьке мікровікно між
+    /// markReaped у ProcessRunner і `currentProcess.value = nil` у
     /// TransferEngine/PushEngine/RemoteFileTransfer). ChildProcess мусить після reap
     /// перетворювати обидва методи на no-op — сигнал більше нікуди не йде.
     func testSignalsAfterReapAreNoOps() async throws {
@@ -158,9 +158,9 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertEqual(child.terminationStatus, 0)
     }
 
-    // MARK: - 2.3: одноразова ескалація на ChildProcess
+    // MARK: - Одноразова ескалація на ChildProcess
 
-    /// Два виклики `terminateWithEscalation()` на ОДИН процес мають послати РІВНО один
+    /// Два виклики `terminateWithEscalation()` на один процес мають послати рівно один
     /// SIGTERM — другий виклик мусить бути тихим no-op (idempotent, `escalationIssued` під
     /// lock). `trap ... TERM; while :; do :; done` рахує самі отримані сигнали: якщо б SIGTERM
     /// прийшов двічі, trap надрукував би "T" двічі, перш ніж встиг exit 0 після першого.
@@ -190,7 +190,7 @@ final class ProcessRunnerTests: XCTestCase {
         )
     }
 
-    // MARK: - 2.4: stream() — довгоживучий процес, stdout чанками
+    // MARK: - stream() — довгоживучий процес, stdout чанками
 
     func testStreamDeliversChunksAndFinishes() async throws {
         var chunks: [Data] = []
@@ -241,14 +241,14 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertLessThanOrEqual(elapsed, 3.5)
     }
 
-    // MARK: - 6: ChildProcessRegistry / terminateAllChildren — бекстоп проти сиріт
+    // MARK: - ChildProcessRegistry / terminateAllChildren — бекстоп проти сиріт
 
-    /// Аудит-знахідка (спринт 3С, п.6): SIGTERM/SIGINT/kill самого додатка НЕ каскадується на
-    /// дочірні adb-процеси (posix_spawn-дитина репарентиться до launchd, не гине разом із
-    /// батьком — стандартна Unix-поведінка) — `ProcessRunner.terminateAllChildren()`
-    /// (AppDelegate-обробник SIGTERM/SIGINT і `applicationWillTerminate`) мусить убити ВСІ ще
-    /// живі зареєстровані процеси. На відміну від testCancelViaOnSpawnTerminates (де тест сам
-    /// кличе `child.terminate()` напряму) — тут навмисно термінуємо ЧЕРЕЗ реєстр
+    /// SIGTERM/SIGINT/kill самого додатка не каскадується на дочірні adb-процеси
+    /// (posix_spawn-дитина репарентиться до launchd, не гине разом із батьком — стандартна
+    /// Unix-поведінка) — `ProcessRunner.terminateAllChildren()` (AppDelegate-обробник
+    /// SIGTERM/SIGINT і `applicationWillTerminate`) мусить убити всі ще живі зареєстровані
+    /// процеси. На відміну від testCancelViaOnSpawnTerminates (де тест сам кличе
+    /// `child.terminate()` напряму) — тут навмисно термінуємо через реєстр
     /// (ChildProcessRegistry.swift), не через captured `child`, щоб довести: реєстр сам
     /// знаходить і вбиває процес без жодного явного посилання ззовні.
     func testTerminateAllChildrenKillsSpawnedProcess() async throws {
@@ -281,12 +281,13 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertFalse(child.isRunning, "процес мав бути мертвим після terminateAllChildren()")
     }
 
-    // MARK: - 2.5: stream() фінішує лише після EOF ОБОХ пайпів (stdout і stderr)
+    // MARK: - stream() фінішує лише після EOF обох пайпів (stdout і stderr)
 
     /// `echo out; echo err-late >&2; exit 2` — stdout закривається раніше stderr (stderr
-    /// дописується вже ПІСЛЯ stdout). Без очікування EOF обох пайпів `finish(throwing:)` міг
-    /// статись одразу на EOF stdout, ще до того, як readabilityHandler stderr встиг прочитати
-    /// "err-late" — помилка тоді летіла б із порожнім/неповним stderr. Повторено 20 разів:
+    /// дописується вже після stdout). Без очікування EOF обох пайпів `finish(throwing:)` міг
+    /// би статись одразу на EOF stdout, ще до того, як readabilityHandler stderr встиг
+    /// прочитати "err-late" — помилка тоді летіла б із порожнім/неповним stderr. Повторено
+    /// 20 разів:
     /// гонка між двома незалежними internal dispatch-чергами readabilityHandler-а не завжди
     /// відтворюється з першого разу.
     func testStreamWaitsForBothPipesBeforeFinishing() async throws {

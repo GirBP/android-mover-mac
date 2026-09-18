@@ -1,17 +1,16 @@
 import Foundation
 import AndroidMoverCore
 
-/// 3.3: механіка черги операцій — `extension TransferCoordinator` (той самий тип, що в
-/// TransferCoordinator.swift, розбитий по файлах, як 2.8 розбило ADBClient/TransferEngine).
-/// Публічний API: `enqueueTransfer`/`enqueuePush` (додати в чергу), `cancel(id:)`/`remove(id:)`/
-/// `clearFinished()` (керування чергою з OperationQueuePanel), `hasActiveTransfer` (гейт
-/// DeviceStore/BrowserStore, AppState.init). `runNextIfNeeded()` — приватний мотор
-/// послідовного виконання: щонайбільше ОДИН елемент `.active` одночасно, виклик після кожного
-/// enqueue і після завершення кожної операції.
+/// Механіка черги операцій — `extension TransferCoordinator` (той самий тип, що в
+/// TransferCoordinator.swift, розбитий по файлах). Публічний API: `enqueueTransfer`/
+/// `enqueuePush` (додати в чергу), `cancel(id:)`/`remove(id:)`/`clearFinished()` (керування
+/// чергою з OperationQueuePanel), `hasActiveTransfer` (гейт DeviceStore/BrowserStore,
+/// AppState.init). `runNextIfNeeded()` — приватний мотор послідовного виконання: щонайбільше
+/// один елемент `.active` одночасно, виклик після кожного enqueue і після завершення кожної
+/// операції.
 extension TransferCoordinator {
-    /// 2.2/3.3: «є активний transfer у черзі» — той самий сигнал, що раніше давав одиночний
-    /// `transfer != nil`. Лише transfer (copy/move), НЕ push — та сама умова, що була до 3.3
-    /// (push ніколи не блокував track-devices/лістинг, і далі не блокує).
+    /// «Є активний transfer у черзі» — лише transfer (copy/move), не push: push ніколи не
+    /// блокував track-devices/лістинг.
     var hasActiveTransfer: Bool {
         queue.contains {
             guard case .transfer(let session) = $0 else { return false }
@@ -25,13 +24,13 @@ extension TransferCoordinator {
     /// була порожня/без активного елемента, запуск відбувається негайно (1:1 зі старою
     /// поведінкою "натиснув — почалось"); якщо ні — елемент чекає своєї черги зі станом
     /// `.pending` (OperationQueuePanel показує "У черзі").
-    /// v0.12.2 (M1, аудит H1): пристрій — ЯВНИЙ параметр, а не `deviceStore.activeDevice`.
-    /// Відновлення після краху передає сюди serial із журналу; звичайний старт — активний.
+    /// Пристрій — явний параметр, а не `deviceStore.activeDevice`: відновлення після краху
+    /// передає сюди serial із журналу, звичайний старт — активний.
     func enqueueTransfer(entries: [RemoteEntry], destination: URL, move: Bool, serial: String, deviceLabel: String) {
         guard let client = deviceStore.client, !entries.isEmpty else { return }
         let engine = TransferEngine(client: client, checksumPolicy: Self.checksumPolicy)
-        // v0.11.0 (P4): запис у журнал ще ДО старту — крах посеред операції лишить його
-        // відкритим, і наступний запуск запропонує продовжити.
+        // Запис у журнал ще до старту — крах посеред операції лишить його відкритим, і
+        // наступний запуск запропонує продовжити.
         let record = JournalRecord(
             kind: .pull, serial: serial, deviceLabel: deviceLabel,
             move: move, destination: destination.path,
@@ -47,11 +46,11 @@ extension TransferCoordinator {
         )
         session.launch = { [weak self, weak session] in
             guard let self, let session else { return }
-            // Аудит-фікс (критично, п.1): ПЕРЕВІРКА, не повторне читання "поточного активного
-            // пристрою" — serial зафіксований у enqueueTransfer вище, разом з entries/
-            // destination. Якщо саме ЦЕЙ пристрій зник чи більше не ready, елемент чесно
-            // провалюється — жодного pull/delete проти якогось ІНШОГО (можливо, підключеного
-            // щойно) пристрою під чужими шляхами.
+            // Перевірка, не повторне читання «поточного активного пристрою» — serial
+            // зафіксований у enqueueTransfer вище, разом з entries/destination. Якщо саме
+            // цей пристрій зник чи більше не ready, елемент чесно провалюється — жодного
+            // pull/delete проти якогось іншого (можливо, підключеного щойно) пристрою під
+            // чужими шляхами.
             guard self.deviceStore.devices.contains(where: { $0.serial == session.targetSerial && $0.state == .ready }) else {
                 session.globalError = String(localized: "Пристрій \(session.targetDeviceLabel) більше не підключений")
                 session.results = []
@@ -69,7 +68,7 @@ extension TransferCoordinator {
                             }
                         },
                         onItemFinished: { result in
-                            // v0.11.0 (P4): стан кожного елемента — у журнал одразу, не в кінці.
+                            // Стан кожного елемента — у журнал одразу, не в кінці.
                             let state: JournalItemState
                             switch result.status {
                             case .copied, .moved, .cancelled: state = JournalItemState(kind: .done, localPath: result.finalURL?.path)
@@ -87,7 +86,7 @@ extension TransferCoordinator {
                     }
                     self.activeJournalIDs.remove(record.id)
                     self.loadRecoverable()
-                    // Усі елементи, включно з failed/cancelled — чесність журналу (A5).
+                    // Усі елементи, включно з failed/cancelled — чесність журналу.
                     self.appendHistory(
                         direction: move ? "move" : "copy",
                         items: results.map(TransferCoordinator.historyItem(for:))
@@ -101,7 +100,7 @@ extension TransferCoordinator {
                             return entry.path
                         }
                         let movedAny = results.contains { $0.status == .moved }
-                        // Best-effort, fire-and-forget: ніколи не блокує і не провалює перенесення (A6).
+                        // Best-effort, fire-and-forget: ніколи не блокує і не провалює перенесення.
                         if movedAny {
                             Task {
                                 try? await client.rescanMedia(movedMediaPaths, on: serial)
@@ -116,13 +115,13 @@ extension TransferCoordinator {
                     self.activeJournalIDs.remove(record.id)
                     self.loadRecoverable()
                 }
-                // 2.2: transfer щойно завершився (results виставлено обома шляхами вище) —
+                // Transfer щойно завершився (results виставлено обома шляхами вище) —
                 // DeviceStore міг заморозити кадри track-devices, доки hasActiveTransfer був
-                // true; публікуємо найсвіжіший накопичений кадр ЗАРАЗ.
+                // true; публікуємо найсвіжіший накопичений кадр зараз.
                 self.onOperationEnded?()
                 self.browserStore.invalidateListingCache()
                 await self.browserStore.refreshList()
-                // 3.3: цей елемент завершився — звільняємо чергу для наступного `.pending`.
+                // Цей елемент завершився — звільняємо чергу для наступного `.pending`.
                 self.runNextIfNeeded()
             }
         }
@@ -131,8 +130,8 @@ extension TransferCoordinator {
         runNextIfNeeded()
     }
 
-    /// Дзеркало enqueueTransfer для push (B1) — той самий deferred-launch патерн; `destDir`
-    /// знімається ТУТ (момент постановки в чергу), не в момент фактичного старту.
+    /// Дзеркало enqueueTransfer для push — той самий deferred-launch патерн; `destDir`
+    /// знімається тут (момент постановки в чергу), не в момент фактичного старту.
     func enqueuePush(urls: [URL], destDir: String, serial: String, deviceLabel: String) {
         guard let client = deviceStore.client, !urls.isEmpty else { return }
         let engine = PushEngine(client: client)
@@ -151,8 +150,8 @@ extension TransferCoordinator {
         )
         session.launch = { [weak self, weak session] in
             guard let self, let session else { return }
-            // Аудит-фікс (п.1) — те саме, що в enqueueTransfer вище: перевірка ЗАФІКСОВАНОГО
-            // serial, не повторне читання поточного активного пристрою.
+            // Те саме, що в enqueueTransfer вище: перевірка зафіксованого serial, не
+            // повторне читання поточного активного пристрою.
             guard self.deviceStore.devices.contains(where: { $0.serial == session.targetSerial && $0.state == .ready }) else {
                 session.globalError = String(localized: "Пристрій \(session.targetDeviceLabel) більше не підключений")
                 session.results = []
@@ -184,7 +183,7 @@ extension TransferCoordinator {
                     self.loadRecoverable()
                     self.appendHistory(direction: "push", items: results.map(TransferCoordinator.historyItem(forPush:)))
 
-                    // Best-effort, fire-and-forget: ніколи не блокує і не провалює push (A6).
+                    // Best-effort, fire-and-forget: ніколи не блокує і не провалює push.
                     let pushedMediaPaths = results.compactMap { result -> String? in
                         guard result.status == .pushed, let remotePath = result.remotePath,
                               MediaKind.mediaExtensions.contains((result.name as NSString).pathExtension.lowercased())
@@ -215,8 +214,8 @@ extension TransferCoordinator {
     // MARK: - Керування чергою (OperationQueuePanel)
 
     /// `.pending` — прибирає елемент із черги без запуску (ніколи не викликав engine).
-    /// `.active` — скасовує роботу, що виконується (SIGTERM→3с→SIGKILL, як і раніше); рядок
-    /// лишається в черзі до фактичного завершення Task (результат "cancelled" по елементах).
+    /// `.active` — скасовує роботу, що виконується (SIGTERM→3с→SIGKILL); рядок лишається в
+    /// черзі до фактичного завершення Task (результат "cancelled" по елементах).
     /// `.finished` — no-op, для прибирання завершених є `remove(id:)`/`clearFinished()`.
     func cancel(id: UUID) {
         guard let item = queue.first(where: { $0.id == id }) else { return }
@@ -237,7 +236,7 @@ extension TransferCoordinator {
         queue.removeAll { $0.rowState == .finished }
     }
 
-    // MARK: - Аудит-фікс (п.5): підтвердження закриття вікна/виходу з додатка
+    // MARK: - Підтвердження закриття вікна/виходу з додатка
 
     /// Чи є в черзі щось незавершене (active чи pending) — і AppDelegate
     /// (applicationShouldTerminate), і WindowAccessor (windowShouldClose одного вікна)
@@ -250,8 +249,8 @@ extension TransferCoordinator {
     /// користувач підтвердив закриття попри активну роботу. pending — прибрати з черги
     /// (ніколи не стартував, нічого скасовувати); active — cancel() (та сама SIGTERM-
     /// ескалація, що й звичайна кнопка «Скасувати» в панелі) — синхронно шле сигнал
-    /// дочірньому adb-процесу НЕГАЙНО, а не покладається лише на бекстоп процес-рівня (п.6,
-    /// ChildProcessRegistry — той спрацює однаково, але пізніше й лише при фактичному виході).
+    /// дочірньому adb-процесу негайно, а не покладається лише на бекстоп процес-рівня
+    /// (ChildProcessRegistry — той спрацює однаково, але пізніше й лише при фактичному виході).
     func cancelAll() {
         for item in queue where item.rowState == .active {
             item.requestCancel()
@@ -261,7 +260,7 @@ extension TransferCoordinator {
 
     // MARK: - Послідовний запуск
 
-    /// Щонайбільше ОДИН елемент `.active` одночасно — якщо такий уже є, нічого не робимо
+    /// Щонайбільше один елемент `.active` одночасно — якщо такий уже є, нічого не робимо
     /// (наступний `.pending` дочекається завершення поточного, яке саме й покличе цей метод
     /// знову). Викликається після кожного enqueue і в кінці кожного launch-Task.
     private func runNextIfNeeded() {
@@ -270,7 +269,7 @@ extension TransferCoordinator {
         queue.first(where: { $0.rowState == .pending })?.start()
     }
 
-    // MARK: - v0.11.0 (P4): відновлення після краху
+    // MARK: - Відновлення після краху
 
     /// Політика контрольних сум із Settings («Звіряти md5»: перед видаленням / завжди / ніколи).
     static var checksumPolicy: ChecksumPolicy {
@@ -278,7 +277,7 @@ extension TransferCoordinator {
     }
 
     func loadRecoverable() {
-        // Записи операцій, що виконуються ЗАРАЗ у цій сесії, теж «відкриті» — але це не
+        // Записи операцій, що виконуються зараз у цій сесії, теж «відкриті» — але це не
         // «незавершене з минулого», банер їх не показує.
         recoverable = journal.unfinished().filter { !activeJournalIDs.contains($0.id) }
         recoveryMessage = nil
@@ -290,10 +289,10 @@ extension TransferCoordinator {
     }
 
     /// «Продовжити»: решта елементів → нова операція в чергу; «скопійовано, але не видалено»
-    /// → довидалення після ПОВТОРНОЇ перевірки (копія на Mac існує і розмір збігається з
+    /// → довидалення після повторної перевірки (копія на Mac існує і розмір збігається з
     /// файлом на телефоні прямо зараз). Потребує того самого пристрою в стані ready.
     func resumeRecovery(_ record: JournalRecord) {
-        // v0.14.0 (Wi-Fi): телефон шукаємо за стабільною ідентичністю з журналу — після перезавантаження
+        // Телефон шукаємо за стабільною ідентичністю з журналу — після перезавантаження
         // Wi-Fi-адреса інша, а телефон той самий; старий запис без ідентичності — лише той самий serial.
         let serial = record.deviceStableID.flatMap { deviceStore.connectedSerial(forStableID: $0) } ?? record.serial
         guard deviceStore.devices.contains(where: { $0.serial == serial && $0.state == .ready }),
@@ -329,8 +328,8 @@ extension TransferCoordinator {
         }
     }
 
-    /// Довидалення з телефона ЛИШЕ тих файлів, чия копія на Mac існує і чий розмір на телефоні
-    /// ЗАРАЗ збігається з копією (файл не змінився з моменту переносу). Теки — пропускаються з
+    /// Довидалення з телефона лише тих файлів, чия копія на Mac існує і чий розмір на телефоні
+    /// зараз збігається з копією (файл не змінився з моменту переносу). Теки — пропускаються з
     /// поясненням (їх безпечно видалити лише пофайлово, що робить сам рушій під час move).
     private func finishPendingDeletes(_ items: [(entry: JournalEntry, localPath: String?)], client: ADBClient, serial: String, deviceLabel: String) async {
         var safeToDelete: [String] = []
@@ -346,8 +345,8 @@ extension TransferCoordinator {
                                                 status: "failed: копію не підтверджено — на телефоні не видалено", localPath: item.localPath))
                 continue
             }
-            // v0.12.2 (M1, аудит M1): та сама md5-політика, що й у штатному move — розмір сам по
-            // собі не доводить, що копія на Mac побайтово та сама.
+            // Та сама md5-політика, що й у штатному move — розмір сам по собі не доводить,
+            // що копія на Mac побайтово та сама.
             if Self.checksumPolicy != .never {
                 let remoteSums = try? await client.checksumsMany([item.entry.path], on: serial)
                 let localHash = try? TransferEngine.md5Hex(of: URL(fileURLWithPath: localPath))
@@ -376,9 +375,9 @@ extension TransferCoordinator {
         await browserStore.refreshList()
     }
 
-    /// v0.11.0 (P5): доки в черзі є активна операція — Mac не засинає сам (idle sleep):
-    /// сон посеред pull/push розриває USB-сесію adb. Кришку/⌘-Sleep це не блокує — лише
-    /// автоматичне засинання від бездіяльності.
+    /// Доки в черзі є активна операція — Mac не засинає сам (idle sleep): сон посеред
+    /// pull/push розриває USB-сесію adb. Кришку/⌘-Sleep це не блокує — лише автоматичне
+    /// засинання від бездіяльності.
     func updateSleepAssertion() {
         let busy = queue.contains { $0.rowState == .active }
         if busy, sleepActivity == nil {

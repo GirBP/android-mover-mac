@@ -1,19 +1,19 @@
 import Foundation
 import CryptoKit
 
-/// v0.11.0 (P1): коли звіряти md5 копії з телефоном. `beforeDelete` — лише коли джерело
-/// буде видалене («Перемістити»): це єдина незворотна дія, і перевірка за розміром там
-/// недостатня. `always` — і для копіювання (повільніше: телефон хешує ~50–200 МБ/с).
+/// Коли звіряти md5 копії з телефоном. `beforeDelete` — лише коли джерело буде видалене
+/// («Перемістити»): це єдина незворотна дія, і перевірка за розміром там недостатня.
+/// `always` — і для копіювання (повільніше: телефон хешує ~50–200 МБ/с).
 public enum ChecksumPolicy: String, Sendable, CaseIterable {
     case never
     case beforeDelete
     case always
 }
 
-/// v0.12.2 (M1, аудит H4): доказ, що САМЕ ці файли пройшли перевірку проти телефона (кількість і
-/// розміри, а за політикою — і md5). Конструюється лише `TransferEngine.verify` (private init) — і це
-/// ЄДИНИЙ вхід для видалення джерела після переміщення (`deleteVerifiedTree`). Список, за яким
-/// видаляють, більше не може розійтися зі списком, який перевіряли (P7-оновлення включно).
+/// Доказ, що саме ці файли пройшли перевірку проти телефона (кількість і розміри, а за
+/// політикою — і md5). Конструюється лише `TransferEngine.verify` (private init) — і це
+/// єдиний вхід для видалення джерела після переміщення (`deleteVerifiedTree`). Список, за яким
+/// видаляють, не може розійтися зі списком, який перевіряли.
 public struct VerifiedManifest: Sendable {
     public let files: [RemoteFileRecord]
     public let checksumVerified: Bool
@@ -31,7 +31,7 @@ public struct VerifiedManifest: Sendable {
 extension TransferEngine {
     // MARK: - Допоміжні
 
-    /// B2: чи виправдовує ця помилка цикл докачки (waitForDevice → resumeMissing)? Лише
+    /// Чи виправдовує ця помилка цикл докачки (waitForDevice → resumeMissing)? Лише
     /// ADBError — pull/verify/timeout/commandFailed/pullProducedNothing тощо — означає, що
     /// причина в зв'язку з телефоном і джерело там ціле, тож варто почекати й спробувати ще.
     /// .cancelled виключено окремо: це наш власний сигнал скасування, не привід ретраяти.
@@ -43,8 +43,8 @@ extension TransferEngine {
         case .cancelled, .remoteMissing, .unsafeDeletePath, .unsafePushTarget, .destinationNotWritable, .notEnoughDiskSpace, .notEnoughSpaceOnDevice, .wirelessFailed:
             return false
         case .commandFailed(_, _, let stderr) where isNoSpaceLeft(stderr: stderr):
-            // v0.12.2 (M1, аудит M3): ENOSPC на телефоні не лікується очікуванням пристрою —
-            // без цього push у повний телефон крутив 15 марних спроб.
+            // ENOSPC на телефоні не лікується очікуванням пристрою — без цього push у повний
+            // телефон крутив би 15 марних спроб.
             return false
         default:
             return true
@@ -57,14 +57,14 @@ extension TransferEngine {
         return lower.contains("no space left") || lower.contains("enospc")
     }
 
-    /// 1.3: людське повідомлення про частковий провал виставлення дати створення — файли на
+    /// Людське повідомлення про частковий провал виставлення дати створення — файли на
     /// місці, страждає лише мітка "дата створення" у Finder. `failures: 0` (типовий випадок) → nil.
     static func dateWarning(failures: Int) -> String? {
         guard failures > 0 else { return nil }
         return "Не вдалося виставити дату створення для \(failures) файлів — вміст скопійовано."
     }
 
-    /// 1.3: з'єднує два опціональних попередження одним рядком через пробіл — використовується,
+    /// З'єднує два опціональних попередження одним рядком через пробіл — використовується,
     /// коли і дата, і видалення після move провалились одночасно; nil-частини випадають мовчки.
     static func joinWarnings(_ first: String?, _ second: String?) -> String? {
         [first, second].compactMap { $0 }.joined(separator: " ").isEmpty
@@ -94,8 +94,8 @@ extension TransferEngine {
         return hasher.finalize().map { String(format: "%02x", $0) }.joined()
     }
 
-    /// Порівнює md5 кожного очікуваного файла з телефонним. Повертає СИРІ відносні шляхи
-    /// (rawRelative) файлів, що не збіглись АБО для яких телефон не дав хеш (fail-closed:
+    /// Порівнює md5 кожного очікуваного файла з телефонним. Повертає сирі відносні шляхи
+    /// (rawRelative) файлів, що не збіглись або для яких телефон не дав хеш (fail-closed:
     /// «не можу перевірити» = «не збігається»).
     static func checksumMismatches(
         remote: [String: String],
@@ -193,7 +193,7 @@ extension TransferEngine {
     }
 
     /// Порівнює те, що прийшло, з тим, що було на телефоні: кількість файлів і розмір кожного.
-    /// v0.12.2: повертає `VerifiedManifest` — єдине джерело для видалення після move.
+    /// Повертає `VerifiedManifest` — єдине джерело для видалення після move.
     @discardableResult
     static func verify(expected: [RemoteFileRecord], remoteRoot: String, localRoot: URL, fileManager: FileManager) throws -> VerifiedManifest {
         var expectedMap: [String: Int64] = [:]
@@ -214,7 +214,7 @@ extension TransferEngine {
     }
 
     /// Локальна мапа "відносний шлях (unicode-нормалізований) → розмір" під коренем елемента —
-    /// той самий обхід, що verify() використовував інлайново; B2 (resumeMissing) реюзить його,
+    /// той самий обхід, що verify() використовує інлайново; resumeMissing реюзить його,
     /// щоб порахувати, чого саме бракує, без дублювання правил нормалізації.
     static func localFileMap(root: URL, fileManager: FileManager) -> [String: Int64] {
         var localMap: [String: Int64] = [:]

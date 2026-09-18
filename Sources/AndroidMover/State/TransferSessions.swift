@@ -3,12 +3,12 @@ import Observation
 import Foundation
 import AndroidMoverCore
 
-// Сесії операцій (TransferSession/PushSession) — винесено з TransferCoordinator.swift (DoD ≤400 рядків).
+// Сесії операцій (TransferSession/PushSession) — винесено з TransferCoordinator.swift, щоб той не переростав розумну довжину файлу.
 
 @MainActor
 @Observable
 final class TransferSession: Identifiable {
-    // 3.3: nonisolated — Identifiable-вимога має лишатись доступною поза MainActor
+    // nonisolated — Identifiable-вимога має лишатись доступною поза MainActor
     // (OperationItem.id, State/OperationItem.swift); UUID лише читається, ніколи не
     // мутується після init, тому це безпечно.
     nonisolated let id = UUID()
@@ -18,31 +18,31 @@ final class TransferSession: Identifiable {
     var progress = TransferProgress() {
         didSet { rate.record(bytesDone: progress.bytesDone, bytesTotal: progress.bytesTotal, at: Date().timeIntervalSinceReferenceDate) }
     }
-    /// v0.10.4: швидкість/залишок часу — з кожного оновлення progress (TransferRateEstimator, Core).
+    /// Швидкість/залишок часу — з кожного оновлення progress (TransferRateEstimator, Core).
     var rate = TransferRateEstimator()
     var results: [TransferItemResult]?
     var globalError: String?
     var cancelRequested = false
-    /// 3.3: true щойно `TransferQueue.runNextIfNeeded()` фактично запустив Task для цього
-    /// елемента черги (не просто додав його в `queue`). `isRunning` (нижче) сама по собі НЕ
+    /// true щойно `TransferQueue.runNextIfNeeded()` фактично запустив Task для цього
+    /// елемента черги (не просто додав його в `queue`). `isRunning` (нижче) сама по собі не
     /// розрізняє "ще не стартувала" від "виконується" (обидві мають `results == nil`) — тому
     /// `OperationItem.rowState` дивиться на `started`+`results` разом.
     var started = false
-    /// 3.3: відкладений запуск. `enqueueTransfer` (TransferQueue.swift) конструює сесію одразу
+    /// Відкладений запуск. `enqueueTransfer` (TransferQueue.swift) конструює сесію одразу
     /// (щоб рядок з'явився в черзі миттєво), але саму роботу — Task, що читає
     /// `deviceStore.activeDevice?.serial` і кличе `engine.transfer(...)` — відкладає сюди.
-    /// Завдяки цьому serial для кожного елемента резолвиться АКТУАЛЬНИМ на момент його
+    /// Завдяки цьому serial для кожного елемента резолвиться актуальним на момент його
     /// власного старту, а не на момент постановки в чергу (item міг чекати своєї черги,
     /// доки виконувались попередні). `runNextIfNeeded()` викликає це рівно один раз і одразу
     /// звільняє (`= nil`) — інакше сесія тримала б замикання (і, транзитивно, `self`) вічно.
     var launch: (() -> Void)?
-    /// Аудит-фікс (критично, п.1): serial+назва пристрою, ЗАФІКСОВАНІ на момент постановки в
-    /// чергу (enqueueTransfer) — той самий момент, що дав `entries`/`destination`. Раніше
-    /// serial читався у launch (момент СТАРТУ, а не enqueue) — якщо між постановкою в чергу і
-    /// фактичним стартом користувач перемикав активний пристрій, launch тягнув би pull ЧУЖИХ
-    /// шляхів (entries — зі старого пристрою) і, для move, видаляв би файли НЕ на тому
-    /// телефоні. Тепер launch лише ПЕРЕВІРЯЄ, що САМЕ ЦЕЙ serial усе ще підключений і ready —
-    /// інакше чесний провал, а не мовчазна робота не з тим пристроєм.
+    /// Serial+назва пристрою, зафіксовані на момент постановки в чергу (enqueueTransfer) —
+    /// той самий момент, що дав `entries`/`destination`. Якщо читати serial лише в launch
+    /// (момент старту, а не enqueue), і між постановкою в чергу і фактичним стартом
+    /// користувач перемкне активний пристрій, launch тягнув би pull чужих шляхів (entries —
+    /// зі старого пристрою) і, для move, видаляв би файли не на тому телефоні. Тому launch
+    /// лише перевіряє, що саме цей serial усе ще підключений і ready — інакше чесний
+    /// провал, а не мовчазна робота не з тим пристроєм.
     let targetSerial: String
     let targetDeviceLabel: String
 
@@ -56,8 +56,8 @@ final class TransferSession: Identifiable {
 
     var isRunning: Bool { results == nil }
 
-    /// v0.10.4: «45,2 MB/s · ~3 хв» — лише під час фактичного копіювання (pull/докачка);
-    /// у фазах verify/дати/rm байти не рухаються, і цифра лише вводила б в оману.
+    /// «45,2 MB/s · ~3 хв» — лише під час фактичного копіювання (pull/докачка); у фазах
+    /// verify/дати/rm байти не рухаються, і цифра лише вводила б в оману.
     var throughputLabel: String? {
         switch progress.phase {
         case .pulling, .resuming: break
@@ -80,9 +80,8 @@ final class TransferSession: Identifiable {
         engine.cancel()
     }
 
-    /// 3.3: підпис фази — раніше жив приватним computed-property у TransferSheet; переїхав
-    /// сюди, бо той самий текст тепер потрібен і в OperationQueuePanel (рядок активної
-    /// операції в черзі), не лише в "Деталі…"-sheet.
+    /// Підпис фази — тут, бо той самий текст потрібен і в OperationQueuePanel (рядок
+    /// активної операції в черзі), не лише в "Деталі…"-sheet.
     var phaseLabel: String {
         switch progress.phase {
         case .counting: return String(localized: "Рахую файли…")
@@ -122,7 +121,7 @@ final class PushSession: Identifiable {
     var cancelRequested = false
     var started = false
     var launch: (() -> Void)?
-    /// Аудит-фікс (п.1) — те саме, що в TransferSession, дивись коментар там.
+    /// Те саме, що в TransferSession, дивись коментар там.
     let targetSerial: String
     let targetDeviceLabel: String
 

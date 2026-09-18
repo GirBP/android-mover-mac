@@ -1,9 +1,9 @@
 import SwiftUI
 import AndroidMoverCore
 
-/// 2.3: спільний контракт рядка результату — TransferItemResult (Android → Mac) і
-/// PushItemResult (Mac → Android, B1) конформлять через retroactive-розширення нижче
-/// (обидва типи живуть у Core, який цей спринт не чіпає).
+/// Спільний контракт рядка результату — TransferItemResult (Android → Mac) і
+/// PushItemResult (Mac → Android) конформлять через retroactive-розширення нижче (обидва
+/// типи живуть у Core).
 protocol OperationResultRow: Identifiable {
     var rowName: String { get }
     var isSuccess: Bool { get }
@@ -70,16 +70,16 @@ extension PushItemResult: OperationResultRow {
     }
 }
 
-/// 2.3: один view для TransferSheet/PushSheet — раніше майже ідентичні файли різнились лише
-/// заголовками, фазовими підписами й кнопкою «Показати у Finder» (лише transfer). Усе спільне
-/// (running/summary-структура, іконки, підсумковий текст) живе тут; різне — параметри й
-/// замикання, які передає тонка обгортка (TransferSheet.swift/PushSheet.swift, ≤40 рядків).
+/// Один view для TransferSheet/PushSheet — уникає майже ідентичних файлів, що різняться
+/// лише заголовками, фазовими підписами й кнопкою «Показати у Finder» (лише transfer). Усе
+/// спільне (running/summary-структура, іконки, підсумковий текст) живе тут; різне — параметри
+/// й замикання, які передає тонка обгортка (TransferSheet.swift/PushSheet.swift).
 struct OperationSheet<Row: OperationResultRow>: View {
     let isRunning: Bool
     let runningTitle: String
-    /// Аудит-фікс (п.1): пристрій, ДЛЯ ЯКОГО цю операцію поставлено в чергу (зафіксований на
-    /// момент enqueue) — показуємо завжди, попри те, що активний пристрій міг відтоді
-    /// змінитись (TransferQueue.swift, TransferSession/PushSession.targetDeviceLabel).
+    /// Пристрій, для якого цю операцію поставлено в чергу (зафіксований на момент enqueue) —
+    /// показуємо завжди, попри те, що активний пристрій міг відтоді змінитись
+    /// (TransferQueue.swift, TransferSession/PushSession.targetDeviceLabel).
     let deviceLabel: String
     let phaseLabel: String
     let progressFraction: Double
@@ -88,7 +88,7 @@ struct OperationSheet<Row: OperationResultRow>: View {
     let bytesTotal: Int64
     let itemsDone: Int
     let itemsTotal: Int
-    /// v0.10.4: «45,2 MB/s · ~3 хв» або nil поза фазою копіювання.
+    /// «45,2 MB/s · ~3 хв» або nil поза фазою копіювання.
     let throughputLabel: String?
     let cancelRequested: Bool
     let onCancel: () -> Void
@@ -99,7 +99,7 @@ struct OperationSheet<Row: OperationResultRow>: View {
     /// «Переміщено: N» / «Скопійовано: N» / «Надіслано на телефон: N» різниться за флейвором.
     let successTitle: (_ succeeded: Int) -> String
     /// nil — кнопка «Показати у Finder» не показується (push: результат лишається на телефоні).
-    /// v0.10.2: усі перенесені файли пакету — «Показати у Finder» виділяє їх разом.
+    /// Усі перенесені файли пакету — «Показати у Finder» виділяє їх разом.
     let showInFinderURLs: [URL]
     let onClose: () -> Void
 
@@ -113,9 +113,9 @@ struct OperationSheet<Row: OperationResultRow>: View {
         }
         .padding(24)
         .frame(width: 460)
-        // 3.3: більше НЕ модальний sheet ("Деталі…" відкривається лише для завершених
-        // елементів черги, isRunning тут завжди false) — interactiveDismissDisabled прибрано,
-        // sheet можна закрити свайпом/Esc так само вільно, як HistoryView.
+        // Не модальний sheet ("Деталі…" відкривається лише для завершених елементів черги,
+        // isRunning тут завжди false) — sheet можна закрити свайпом/Esc так само вільно, як
+        // HistoryView.
     }
 
     private var runningView: some View {

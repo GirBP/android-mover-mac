@@ -4,10 +4,10 @@ import UniformTypeIdentifiers
 import AndroidMoverCore
 
 /// Перетягування рядка з таблиці у Finder. Promise-семантика Transferable: pull запускається
-/// ЛИШЕ в момент фактичного дропу, не в момент початку драгу — скасований чи "промахнутий"
+/// лише в момент фактичного дропу, не в момент початку драгу — скасований чи "промахнутий"
 /// драг не займає жодного трафіку з телефона.
 ///
-/// v0.10.2: drag стоїть на `TableRow.draggable` (BrowserView), тож у Finder тягнуться всі виділені
+/// Drag стоїть на `TableRow.draggable` (BrowserView), тож у Finder тягнуться всі виділені
 /// рядки разом — кожен зі своїм payload; помилка pull під час дропу показується системно (macOS),
 /// не нашим UI.
 struct RemoteFileTransfer: Transferable, Sendable {
@@ -24,10 +24,10 @@ struct RemoteFileTransfer: Transferable, Sendable {
             .exportingCondition { $0.entry.isDirectory }
     }
 
-    /// НЕ тягнемо клас ADBClient у struct (Transferable-значення може перетинати межі черг) —
+    /// Не тягнемо клас ADBClient у struct (Transferable-значення може перетинати межі черг) —
     /// створюємо клієнт тут-таки, усередині @Sendable exporting-замикання.
     private static func export(_ transfer: RemoteFileTransfer) async throws -> SentTransferredFile {
-        // v0.10.2: payload тепер на кожному рядку безумовно (TableRow.draggable) — недоступність
+        // Payload на кожному рядку безумовно (TableRow.draggable) — недоступність
         // (нема adb/пристрою, symlink) перевіряється тут, у момент дропу, а не при побудові рядка.
         guard !transfer.adbPath.isEmpty, !transfer.serial.isEmpty, !transfer.entry.isSymlink else {
             throw DragUnavailableError()
@@ -41,9 +41,8 @@ struct RemoteFileTransfer: Transferable, Sendable {
         let cacheDir = PreviewStore.dragCacheRoot.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: cacheDir, withIntermediateDirectories: true)
 
-        // 2.2: спільний контролер скасування (SIGTERM→3с→SIGKILL, одноразова ескалація,
-        // закритий гачок гонки spawn-після-cancel) — раніше тут окремо жили processBox/
-        // cancelled/killIssued/terminateAdbProcess, дубльовані з TransferEngine/PushEngine.
+        // Спільний контролер скасування (SIGTERM→3с→SIGKILL, одноразова ескалація,
+        // закритий гачок гонки spawn-після-cancel).
         let cancellation = CancellationController()
 
         do {

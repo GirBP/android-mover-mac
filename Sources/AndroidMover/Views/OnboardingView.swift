@@ -70,7 +70,7 @@ struct OnboardingView: View {
                     ProgressView().controlSize(.small)
                     Text("Очікую пристрій…").foregroundStyle(.secondary)
                 }
-                // v0.14.0: без кабеля — спарювання через бездротове налагодження.
+                // Без кабеля — спарювання через бездротове налагодження.
                 Button {
                     showingWireless = true
                 } label: {

@@ -9,19 +9,18 @@ struct BrowserView: View {
     // ліз за 400-рядкову межу) читає й пише це в toolbarContent.
     @State var showingHistory = false
     @State var showingPushImporter = false
-    // 3.3: «Деталі…» на завершеному рядку OperationQueuePanel — TransferSheet/PushSheet
-    // лишаються конкретно типізованими sheet-ами (не модальними більше), тому тримаємо два
-    // окремі @State замість одного `$state.transfers.transfer`/`.push` (обидва пішли разом
-    // з одиночними сесіями, замінені чергою `state.transfers.queue`).
+    // «Деталі…» на завершеному рядку OperationQueuePanel — TransferSheet/PushSheet
+    // лишаються конкретно типізованими sheet-ами (не модальними), тому тримаємо два окремі
+    // @State замість одного спільного посилання, спільного для transfer/push.
     @State private var detailsTransfer: TransferSession?
     @State private var detailsPush: PushSession?
-    // 3.2: перемикач pathBar між breadcrumb-рядком і TextField (клік по порожньому місцю
-    // рядка чи ⌘⇧G — той шорткат буде в 3C, тут лише сам state). onSubmit/Escape повертає false.
+    // Перемикач pathBar між breadcrumb-рядком і TextField (клік по порожньому місцю рядка
+    // чи ⌘⇧G, тут лише сам state). onSubmit/Escape повертає false.
     @State private var focusedPathField = false
     @FocusState private var pathFieldFocus: Bool
-    // 3.4: ⌘F фокусує сюди (focusSearch у browserUIActions нижче).
+    // ⌘F фокусує сюди (focusSearch у browserUIActions нижче).
     @FocusState private var searchFieldFocused: Bool
-    // 3.8: ширини колонок таблиці переживають перезапуск — TableColumnCustomization сам
+    // Ширини колонок таблиці переживають перезапуск — TableColumnCustomization сам
     // Codable, SwiftUI дає готовий @AppStorage-ініціалізатор саме під нього.
     @AppStorage("browser.columnCustomization") private var columnCustomization = TableColumnCustomization<RemoteEntry>()
 
@@ -29,15 +28,15 @@ struct BrowserView: View {
         attachFileActionAlerts(to: mainContent)
     }
 
-    /// 3.C: alert-и FileActions (перейменувати/нова тека/помилка дії) винесені в
-    /// BrowserView+Alerts.swift — інакше BrowserView.swift ліз за 400-рядкову межу (як 3.1
-    /// винесла toolbar у BrowserView+Toolbar.swift).
+    /// Alert-и FileActions (перейменувати/нова тека/помилка дії) винесені в
+    /// BrowserView+Alerts.swift, toolbar — у BrowserView+Toolbar.swift, щоб BrowserView.swift
+    /// не переростав розумну довжину файлу.
     private var mainContent: some View {
         VStack(spacing: 0) {
             if state.devices.showDisconnectBanner {
                 DisconnectBanner()
             }
-            // v0.11.0 (P4): незавершена операція з попереднього запуску — продовжити/відхилити.
+            // Незавершена операція з попереднього запуску — продовжити/відхилити.
             if let record = state.transfers.recoverable.first {
                 RecoveryBanner(
                     record: record,
@@ -50,8 +49,8 @@ struct BrowserView: View {
             Divider()
             table
             Divider()
-            // 3.3: немодальна черга — порожня черга не показує нічого (вигляд ідентичний
-            // до-3.3), браузинг (таблиця, поллер) працює під час операцій.
+            // Немодальна черга — порожня черга не показує нічого, браузинг (таблиця,
+            // поллер) працює під час операцій.
             OperationQueuePanel(transfers: state.transfers) { item in
                 switch item {
                 case .transfer(let session): detailsTransfer = session
@@ -61,15 +60,15 @@ struct BrowserView: View {
             bottomBar
         }
         .toolbar { toolbarContent }
-        // 3.4: публікує дії, що потребують локального UI-стану ЦІЄЇ BrowserView (фокус
+        // Публікує дії, що потребують локального UI-стану цієї BrowserView (фокус
         // пошуку/редагування шляху/push-importer) для AppCommands.swift.
         .focusedSceneValue(\.browserUIActions, browserUIActions)
         .confirmationDialog(
-            // Аудит-фікс (п.4): те саме число, що реально піде в enqueueTransfer (startTransfer
-            // бере browserStore.selectedEntries, вже відфільтровані до видимого).
-            // v0.10.1 (перф-фікс, п.5): `pendingMoveCount` — зафіксований у requestTransfer,
-            // НЕ жива `visibleSelection.count` — та підв'язувала б увесь mainContent (нижче)
-            // до selection/entries/filterText лише заради рядка, що здебільшого не показаний.
+            // Те саме число, що реально піде в enqueueTransfer (startTransfer бере
+            // browserStore.selectedEntries, вже відфільтровані до видимого).
+            // `pendingMoveCount` — зафіксований у requestTransfer, не жива
+            // `visibleSelection.count` — та підв'язувала б увесь mainContent (нижче) до
+            // selection/entries/filterText лише заради рядка, що здебільшого не показаний.
             "Перемістити \(state.transfers.pendingMoveCount) елем. на Mac?",
             isPresented: $state.transfers.confirmingMove,
             titleVisibility: .visible
@@ -132,10 +131,9 @@ struct BrowserView: View {
         }
     }
 
-    /// 3.1: deviceBar зник — пристрій/вільне місце тепер у SidebarView (секція "Пристрій"),
-    /// Історія/Оновити/Нова тека — у `.toolbar` вище.
-    /// 3.2: pathBar тепер без quick-place-чіпів (переїхали в sidebar) і без TextField за
-    /// замовчуванням — замість нього клікабельні breadcrumbs (BreadcrumbBar), TextField
+    /// Пристрій/вільне місце — у SidebarView (секція "Пристрій"), Історія/Оновити/Нова
+    /// тека — у `.toolbar` вище. pathBar без quick-place-чіпів (ті в sidebar) і без TextField
+    /// за замовчуванням — замість нього клікабельні breadcrumbs (BreadcrumbBar), TextField
     /// з'являється лише за кліком по порожньому місцю рядка (focusedPathField).
     private var pathBar: some View {
         HStack(spacing: 8) {
@@ -177,7 +175,7 @@ struct BrowserView: View {
                 TextField("Пошук у теці", text: $state.browser.filterText)
                     .textFieldStyle(.plain)
                     .focused($searchFieldFocused)
-                    // v0.10.2: Escape очищає пошук і віддає фокус таблиці — як у полі шляху.
+                    // Escape очищає пошук і віддає фокус таблиці — як у полі шляху.
                     .onExitCommand {
                         state.browser.filterText = ""
                         searchFieldFocused = false
@@ -216,12 +214,12 @@ struct BrowserView: View {
                     nameIcon(for: entry)
                 }
                 .task(id: entry.id) {
-                    // A3: з preview-кешу (миттєвий no-op, якщо там нема); 4.1: інакше — вбудована
+                    // З preview-кешу (миттєвий no-op, якщо там нема); інакше — вбудована
                     // EXIF-мініатюра з перших 64 КБ файла на телефоні, лише поки рядок видимий.
                     state.preview.thumbnails.requestThumbnail(for: entry)
                     await state.preview.thumbnails.loadRemoteThumbnail(for: entry)
                 }
-                // 3.6: Table подає кожну колонку окремим accessibility-елементом — повний
+                // Table подає кожну колонку окремим accessibility-елементом — повний
                 // опис (ім'я+тип+розмір+дата, BrowserView+Accessibility.swift) вішаємо на
                 // клітинку "Назва" (.ignore ховає окремо Text/іконку всередині Label), а
                 // "Розмір"/"Змінено" нижче ховаємо зовсім, щоб VoiceOver не читав те саме двічі.
@@ -250,15 +248,15 @@ struct BrowserView: View {
             .customizationID("modified")
         } rows: {
             ForEach(state.browser.filteredEntries) { entry in
-                // v0.10.2 (баг власника): drag — на рівні РЯДКА (TableRowContent.draggable), НЕ на
-                // вмісті клітинок: `.draggable` на Text/Label перехоплював mouseDown, і клік по
-                // назві/іконці не вибирав рядок (працював лише клік у порожню частину клітинки),
-                // подвійний клік по назві не відкривав теку. Бонус: тягнуться УСІ виділені рядки.
+                // Drag — на рівні рядка (TableRowContent.draggable), не на вмісті клітинок:
+                // `.draggable` на Text/Label перехоплював би mouseDown, і клік по назві/іконці
+                // не вибирав би рядок (працював би лише клік у порожню частину клітинки),
+                // подвійний клік по назві не відкривав би теку. Бонус: тягнуться всі виділені рядки.
                 TableRow(entry).draggable(rowDragPayload(for: entry))
             }
         }
         .contextMenu(forSelectionType: String.self) { ids in
-            // v0.10.1: `index.byID` — O(1) замість `entries.first(where:)` (O(n) на відкриття
+            // `index.byID` — O(1) замість `entries.first(where:)` (O(n) на відкриття
             // контекстного меню).
             if ids.count == 1, let id = ids.first, let entry = state.browser.index.byID[id] {
                 if entry.isDirectory {
@@ -278,9 +276,9 @@ struct BrowserView: View {
             state.preview.handleDoubleClick(ids)
         }
         .quickLookPreview($state.preview.previewURL)
-        // 3.4: Space — Quick Look ОДНОГО вибраного файла (Finder-конвенція).
+        // Space — Quick Look одного вибраного файла (Finder-конвенція).
         .onKeyPress(.space) { quickLookOnSpace() }
-        // Дроп із Finder — push у ПОТОЧНУ відкриту теку телефона (B1). Сам дроп нічого не
+        // Дроп із Finder — push у поточну відкриту теку телефона. Сам дроп нічого не
         // тягне, доки не відпущено кнопку миші (Transferable-семантика URL вбудована в SwiftUI).
         .dropDestination(for: URL.self) { urls, _ in
             guard state.transfers.canPush else { return false }
@@ -288,12 +286,12 @@ struct BrowserView: View {
             return true
         }
         .overlay {
-            // Аудит-фікс (high): і `isIndexBuilding` — не лише `isLoading`. `entries`
-            // приземляється (і `isLoading` гаситься) СИНХРОННО в refreshList(), тоді як
-            // `index` (те, що реально показує таблиця нижче — filteredEntries/byID) ще
-            // будується офф-main (scheduleIndexRebuild); без цієї другої умови таблиця на
-            // це вікно або показувала вміст СТАРОЇ теки (і приймала кліки по ньому), або
-            // хибно "Нічого не знайдено" на реально непорожній новій.
+            // `isIndexBuilding` — не лише `isLoading`. `entries` приземляється (і `isLoading`
+            // гаситься) синхронно в refreshList(), тоді як `index` (те, що реально показує
+            // таблиця нижче — filteredEntries/byID) ще будується офф-main
+            // (scheduleIndexRebuild); без цієї другої умови таблиця на це вікно могла б
+            // показати вміст старої теки (і приймати кліки по ньому), або хибно "Нічого не
+            // знайдено" на реально непорожній новій.
             if state.browser.isLoading || state.browser.isIndexBuilding {
                 ProgressView()
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -315,9 +313,9 @@ struct BrowserView: View {
     }
 
 
-    /// 3.4: Space на таблиці — тека/symlink/множинний вибір ігноруємо (.ignored пропускає
+    /// Space на таблиці — тека/symlink/множинний вибір ігноруємо (.ignored пропускає
     /// подію далі, як і без обробника — не з'їдає Space деінде, напр. у пошуку).
-    /// v0.10.1: `index.byID` — O(1) замість `entries.first(where:)` (O(n) на кожен Space).
+    /// `index.byID` — O(1) замість `entries.first(where:)` (O(n) на кожен Space).
     private func quickLookOnSpace() -> KeyPress.Result {
         guard state.browser.selection.count == 1, let id = state.browser.selection.first,
               let entry = state.browser.index.byID[id],
@@ -327,7 +325,7 @@ struct BrowserView: View {
         return .handled
     }
 
-    /// 3.4: дії AppCommands.swift, що потребують локального UI-стану ЦІЄЇ BrowserView.
+    /// Дії AppCommands.swift, що потребують локального UI-стану цієї BrowserView.
     private var browserUIActions: BrowserUIActions {
         BrowserUIActions(
             focusSearch: { searchFieldFocused = true },
@@ -336,7 +334,7 @@ struct BrowserView: View {
         )
     }
 
-    /// 3.8: "…/батько/тека" (2 останні компоненти) замість голого lastPathComponent — повний
+    /// "…/батько/тека" (2 останні компоненти) замість голого lastPathComponent — повний
     /// шлях лишається доступним через `.help` вище. Однокомпонентний шлях (напр. том-корінь)
     /// показує лише його, без "…/" префікса.
     private static func shortDestinationLabel(_ url: URL) -> String {

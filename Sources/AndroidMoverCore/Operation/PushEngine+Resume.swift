@@ -1,6 +1,6 @@
 import Foundation
 
-/// v0.11.0 (P2): верифікація tmp і докачка push після обриву — винесено з PushEngine.swift (≤400).
+/// Верифікація tmp і докачка push після обриву — винесено з PushEngine.swift.
 extension PushEngine {
     /// Перша спроба: push цілого елемента в tmp + верифікація. При обриві (помилка, яку
     /// `TransferEngine.isResumable` визнає тимчасовою) — цикл докачки: чекаємо пристрій,
@@ -92,7 +92,7 @@ extension PushEngine {
         }
     }
 
-    /// v0.11.0 (P2): допушує лише відсутні/биті файли у tmp на телефоні (порівняння локальної
+    /// Допушує лише відсутні/биті файли у tmp на телефоні (порівняння локальної
     /// мапи з recursiveFiles(tmp)); зайві файли в tmp прибирає. Шляхи на телефон — з сирих
     /// відносних шляхів локального дерева (той самий інваріант, що resumeMissing у pull).
     func resumeMissingPush(
@@ -117,7 +117,7 @@ extension PushEngine {
         let extra = remoteMap.filter { localMap[$0.key] == nil }.map(\.value.path)
         if !extra.isEmpty { _ = try? await client.deleteMany(extra, on: serial) }
 
-        // Локальні відносні шляхи — СИРІ (з enumerator), ключі мапи — нормалізовані.
+        // Локальні відносні шляхи — сирі (з enumerator), ключі мапи — нормалізовані.
         let isDir = (try? localRoot.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory ?? false
         if !isDir {
             if remoteMap[""]?.size != localMap[""] {

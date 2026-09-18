@@ -1,12 +1,12 @@
 import Foundation
 
-/// Метадані й best-effort допоміжні: існування шляху, mtime дерева, вільне місце, MediaStore-рескан.
-/// v0.15.0 (M3): скрипти зі словника `ADBScripts`.
+/// Метадані й best-effort допоміжні: існування шляху, mtime дерева, вільне місце,
+/// MediaStore-рескан. Скрипти зі словника `ADBScripts`.
 extension ADBClient {
-    /// Скільки шляхів рескану MediaStore влазить в один `adb shell` виклик (A6).
+    /// Скільки шляхів рескану MediaStore влазить в один `adb shell` виклик.
     static let rescanBatchSize = 150
 
-    // MARK: - Перевірка існування (B1 push: колізієвільне ім'я на телефоні)
+    // MARK: - Перевірка існування (push: колізієвільне ім'я на телефоні)
 
     /// `true`, якщо шлях існує на телефоні (файл чи тека). Без guard-ів — читання, не запис.
     public func remoteExists(_ path: String, on serial: String) async throws -> Bool {
@@ -42,9 +42,9 @@ extension ADBClient {
         return mtimes
     }
 
-    // MARK: - Вільне місце (A2)
+    // MARK: - Вільне місце
 
-    /// `toybox stat -f` друкує статистику ТОМУ, що містить шлях — тому працює і на кореневій
+    /// `toybox stat -f` друкує статистику тому, що містить шлях, — тому працює і на кореневій
     /// `/sdcard`, і на будь-якій підтеці.
     public func storageInfo(for path: String, on serial: String) async throws -> RemoteStorageInfo {
         let p = RemotePath.normalized(path)
@@ -74,10 +74,10 @@ extension ADBClient {
         return RemoteStorageInfo(totalBytes: totalBlocks * blockSize, availableBytes: availableBlocks * blockSize)
     }
 
-    // MARK: - MediaStore-рескан (A6, best-effort)
+    // MARK: - MediaStore-рескан (best-effort)
 
     /// Просить MediaStore пере-проіндексувати шляхи. Broadcast deprecated і ненадійний по OEM —
-    /// НІКОЛИ не кидає через провал самого broadcast, лише через транспортний збій adb.
+    /// провал самого broadcast не кидає помилку, кидає лише транспортний збій adb.
     public func rescanMedia(_ paths: [String], on serial: String) async throws {
         guard !paths.isEmpty else { return }
         for batch in Self.chunked(paths.map(RemotePath.normalized), size: Self.rescanBatchSize) {

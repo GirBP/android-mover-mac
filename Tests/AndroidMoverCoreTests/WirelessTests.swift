@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 @testable import AndroidMoverCore
 
-/// v0.14.0 (Wi-Fi): ідентичність окремо від адреси, толерантні парсери підкоманд adb, потоки
+/// Ідентичність окремо від адреси, толерантні парсери підкоманд adb, потоки
 /// pair/connect/mdns через mock.
 final class WirelessTests: XCTestCase {
     private let fm = FileManager.default

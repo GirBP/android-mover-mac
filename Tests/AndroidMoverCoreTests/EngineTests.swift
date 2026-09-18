@@ -4,16 +4,16 @@ import XCTest
 
 /// Інтеграційні тести движка через scripts/mock_adb.py — той самий контракт команд, що й у реального adb.
 ///
-/// Той самий набір тестів ганяється на двох бекендах (0.6, спринт 0):
+/// Той самий набір тестів ганяється на двох бекендах:
 ///   AM_TEST_ADB=mock swift test   (default, CI) — весь "телефон" — тека на Mac.
 ///   AM_TEST_ADB=real swift test   (ручний прогін, потрібен ADB_PATH + AM_DEVICE_SERIAL) —
 ///     корінь тестових даних — /sdcard/AndroidMoverE2E/<uuid> на реальному пристрої.
 /// Тести з mock-специфічними ручками (MOCK_CORRUPT_*, MOCK_FAIL_*) самі собі кажуть XCTSkip
 /// у real-режимі — на реальному adb немає способу підмінити цю поведінку.
 
-/// 1.7: детермінований генератор "ворожих" імен файлів — кирилиця, латиниця, цифри, пробіл
+/// Детермінований генератор "ворожих" імен файлів — кирилиця, латиниця, цифри, пробіл
 /// (у т.ч. на краях), лапки/апостроф/бектик, shell-метасимволи (`$()`&;|`), емодзі (у т.ч.
-/// складені) і комбінуючий знак U+0306 — БЕЗ "/" і "\n", ніколи "." чи "..". Власний LCG
+/// складені) і комбінуючий знак U+0306 — без "/" і "\n", ніколи "." чи "..". Власний LCG
 /// (не System random) означає, що той самий seed завжди дає ту саму послідовність — тест
 /// відтворюваний між прогонами й машинами. Спільний для EngineTests (round-trip через mock
 /// listDirectory/rename/delete) і ParserTests (round-trip через реальний `sh`).
@@ -34,15 +34,15 @@ enum FuzzNames {
 
     static let alphabet: [String] = {
         var units: [String] = []
-        // Кирилиця ВКЛЮЧНО з Й/й (0x0419/0x0439) — раніше виключалась через баг
-        // Foundation.Process на Darwin: МОВЧКИ NFD-декомпонував канонічно-композиційні символи
-        // в АРГУМЕНТАХ дочірнього процесу (підтверджено ізольовано: Process(arguments: ["Й"])
-        // дитина бачила "И"+U+0306 замість "Й"). v0.9.2: ProcessRunner переписано на
-        // posix_spawn з байт-у-байт C-рядками (ProcessRunner.byteExactCString) — без жодного
-        // fileSystemRepresentation, тож без жодної декомпозиції; ProcessRunnerTests.
-        // testArgumentsArePassedByteExact/testEnvironmentIsPassedByteExact перевіряють це
-        // напряму. Й/й тут — знову рівноправна частина алфавіту, той самий фазз-тест тепер сам
-        // і є регресійною перевіркою фіксу крізь увесь конвеєр (listDirectory/rename/delete).
+        // Кирилиця включно з Й/й (0x0419/0x0439): `Foundation.Process` на Darwin мовчки
+        // NFD-декомпонує канонічно-композиційні символи в аргументах дочірнього процесу
+        // (підтверджено ізольовано: Process(arguments: ["Й"]) дитина бачить "И"+U+0306 замість
+        // "Й") — ProcessRunner натомість іде через posix_spawn з байт-у-байт C-рядками
+        // (ProcessRunner.byteExactCString), без жодного fileSystemRepresentation, тож без
+        // жодної декомпозиції; ProcessRunnerTests.testArgumentsArePassedByteExact/
+        // testEnvironmentIsPassedByteExact перевіряють це напряму. Й/й тут — рівноправна
+        // частина алфавіту, той самий фазз-тест — регресійна перевірка крізь увесь конвеєр
+        // (listDirectory/rename/delete).
         for scalar in UInt32(0x0410)...UInt32(0x044F) {
             units.append(String(UnicodeScalar(scalar)!))
         }
@@ -175,7 +175,7 @@ final class EngineTests: XCTestCase {
         try fm.createDirectory(at: download, withIntermediateDirectories: true)
         try makeFile(download.appendingPathComponent("самотній.bin"),
                      data: Data("12345".utf8), date: loneDate)
-        // Дату теки виставляємо ПІСЛЯ створення файлів у ній (запис оновлює mtime теки).
+        // Дату теки виставляємо після створення файлів у ній (запис оновлює mtime теки).
         try fm.setAttributes([.modificationDate: vacationDirDate], ofItemAtPath: vacation.path)
     }
 
@@ -228,9 +228,9 @@ final class EngineTests: XCTestCase {
         try fm.setAttributes([.modificationDate: date], ofItemAtPath: url.path)
     }
 
-    /// 1.7: створює файл із РІВНО такими байтами імені, як передано в `name` — на відміну від
+    /// Створює файл із рівно такими байтами імені, як передано в `name` — на відміну від
     /// `Data.write(to: URL)` (і будь-якого шляху через `URL`/`FileManager`), який на Darwin
-    /// іде через `CFStringGetFileSystemRepresentation` і МОВЧКИ NFD-декомпонує деякі символи
+    /// іде через `CFStringGetFileSystemRepresentation` і мовчки NFD-декомпонує деякі символи
     /// (напр. "й" → "и" + U+0306) — артефакт сумісності з HFS+, якого нема на реальному ext4
     /// телефона. Пряме POSIX open/write/close обходить цей шар — так само поводиться і
     /// mock_adb.py (Python os.listdir), і реальний Android: фікстура і те, що дійсно "лежить
@@ -326,9 +326,9 @@ final class EngineTests: XCTestCase {
             .filter { $0.hasPrefix(".androidmover-tmp") }
     }
 
-    /// Додає файл-фікстуру на "телефон" ПОСЕРЕД тесту (після setUp): mock — прямий запис на
-    /// диск (як і раніше), real — push через тимчасову локальну теку (0.6: фікстури через
-    /// client.push, не прямий запис у MOCK_PHONE_ROOT).
+    /// Додає файл-фікстуру на "телефон" посеред тесту (після setUp): mock — прямий запис на
+    /// диск, real — push через тимчасову локальну теку (client.push, не прямий запис у
+    /// MOCK_PHONE_ROOT).
     func addRemoteFile(_ relativePath: String, data: Data, date: Date) async throws {
         if Self.backend == "real" {
             let tmp = fm.temporaryDirectory.appendingPathComponent("am-fixture-\(UUID().uuidString)")
@@ -420,7 +420,7 @@ final class ProgressCollector: @unchecked Sendable {
         return all.last
     }
 
-    /// B2: усі фази, у порядку появи — перевіряє, що цикл докачки справді проходить через
+    /// Усі фази, у порядку появи — перевіряє, що цикл докачки справді проходить через
     /// waitingForDevice/resuming, а не просто мовчки повторює pull.
     var phases: [TransferProgress.Phase] {
         lock.lock(); defer { lock.unlock() }

@@ -3,24 +3,24 @@ import Observation
 import QuickLookThumbnailing
 import AndroidMoverCore
 
-/// Мініатюри з двох джерел: (A3) файли, що вже осіли в preview-кеші після Quick Look —
-/// повноцінна QL-мініатюра без трафіку; (4.1, +Remote.swift) фото JPEG/HEIC на телефоні —
+/// Мініатюри з двох джерел: файли, що вже осіли в preview-кеші після Quick Look —
+/// повноцінна QL-мініатюра без трафіку; фото JPEG/HEIC на телефоні (+Remote.swift) —
 /// вбудований EXIF-thumbnail з перших 64 КБ файла. Масового pull цілих файлів заради іконок
-/// як не було, так і нема. Ключ той самий, що в PreviewStore.previewCacheURL
-/// (шлях|розмір|mtime): нова версія файла на телефоні — нова мініатюра, стара не плутається.
+/// нема. Ключ той самий, що в PreviewStore.previewCacheURL (шлях|розмір|mtime): нова версія
+/// файла на телефоні — нова мініатюра, стара не плутається.
 @MainActor
 @Observable
 final class ThumbnailCache {
     private var cache: [String: NSImage] = [:]
     private var pending: Set<String> = []
-    // v0.10.1 (перф-фікс): ключі, для яких ВЖЕ відомо (PreviewStore.markCached, викликається
-    // одразу після позитивного fileExists у PreviewStore.previewFile), що файл лежить у
-    // preview-кеші на диску. requestThumbnail нижче читає ЛИШЕ це — жодного синхронного
+    // Ключі, для яких уже відомо (PreviewStore.markCached, викликається одразу після
+    // позитивного fileExists у PreviewStore.previewFile), що файл лежить у preview-кеші на
+    // диску. requestThumbnail нижче читає лише це — жодного синхронного
     // FileManager.fileExists (дисковий stat на MainActor) на кожну появу рядка Table під час
     // скролу віртуалізованого списку з 50k елементів.
     private var knownCachedKeys: Set<String> = []
 
-    // 4.1 (ThumbnailCache+Remote.swift): мініатюри з перших 64 КБ файла на телефоні.
+    // Мініатюри з перших 64 КБ файла на телефоні (ThumbnailCache+Remote.swift).
     /// Постачальник перших байтів файла — PreviewStore підключає ADBClient.readHead.
     var remoteFetcher: (@Sendable (RemoteEntry) async throws -> Data)?
     var remotePending: Set<String> = []
@@ -39,7 +39,7 @@ final class ThumbnailCache {
         cache[PreviewStore.previewCacheKey(for: entry)]
     }
 
-    /// PreviewStore викликає одразу після того, як САМ підтвердив (fileExists), що ключ ліг у
+    /// PreviewStore викликає одразу після того, як сам підтвердив (fileExists), що ключ ліг у
     /// previewCacheRoot — єдине джерело правди про те, які ключі реально мають файл на диску.
     func markCached(_ key: String) {
         knownCachedKeys.insert(key)
@@ -47,7 +47,7 @@ final class ThumbnailCache {
 
     /// Якщо файл уже лежить у preview-кеші і мініатюри для нього ще нема — згенерувати
     /// асинхронно через QLThumbnailGenerator. Якщо файла в кеші нема (Quick Look ще не
-    /// робили) — тихо виходить, НІЧОГО не тягнучи з телефона.
+    /// робили) — тихо виходить, нічого не тягнучи з телефона.
     func requestThumbnail(for entry: RemoteEntry) {
         let key = PreviewStore.previewCacheKey(for: entry)
         guard cache[key] == nil, !pending.contains(key), knownCachedKeys.contains(key) else { return }
@@ -68,8 +68,8 @@ final class ThumbnailCache {
         }
     }
 
-    /// v0.12.1 (CI, Swift 6.1): `QLThumbnailRepresentation` і `QLThumbnailGenerator.Request` —
-    /// не-Sendable класи, тому async-API генератора не можна «привезти» на MainActor. Запит
+    /// `QLThumbnailRepresentation` і `QLThumbnailGenerator.Request` — не-Sendable класи
+    /// (Swift 6.1), тому async-API генератора не можна «привезти» на MainActor. Запит
     /// будується тут, поза MainActor, із Sendable-аргументів, а назад повертаються лише PNG-байти
     /// (Data — Sendable на будь-якому компіляторі). Мініатюра 32 pt — конвертація дешева.
     nonisolated private static func generateThumbnailPNG(url: URL, side: CGFloat, scale: CGFloat) async -> Data? {

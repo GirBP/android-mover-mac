@@ -1,6 +1,6 @@
 import Foundation
 
-/// 1.5: прибирання «сиріт» — тимчасових тек `.androidmover-tmp-*` (TransferEngine/PushEngine),
+/// Прибирання «сиріт» — тимчасових тек `.androidmover-tmp-*` (TransferEngine/PushEngine),
 /// які лишаються на диску Mac чи на телефоні після аварійного завершення (crash, kill -9,
 /// вимкнення живлення, розрив adb посеред роботи) — звичайний `defer`/best-effort delete у самих
 /// рушіях не встигає спрацювати. Викликається best-effort при підключенні пристрою/зміні

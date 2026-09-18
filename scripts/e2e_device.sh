@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# scripts/e2e_device.sh — E2E-прогін проти РЕАЛЬНОГО телефона (0.2, спринт 0 "Ґрунт").
+# scripts/e2e_device.sh — E2E-прогін проти реального телефона.
 #
 # Що робить:
 #   1. Знаходить adb і серійник авторизованого пристрою (або бере з env).
-#   2. Ганяє `AM_TEST_ADB=real swift test` — той самий XCTest-набір, що на mock (0.6),
+#   2. Ганяє `AM_TEST_ADB=real swift test` — той самий XCTest-набір, що на mock,
 #      але проти живого adb (корінь тестових даних рушій створює сам:
 #      /sdcard/AndroidMoverE2E/<uuid>, прибирає після себе).
 #   3. Створює свою окрему теку /sdcard/AndroidMoverE2E/golden з файлами-приманками
-#      (кирилиця, пробіл, апостроф, дата через touch -t) і ганяє РІВНО ТІ Ж shell-скрипти,
+#      (кирилиця, пробіл, апостроф, дата через touch -t) і ганяє ті самі shell-скрипти,
 #      які сам ADBClient генерує для listing/find/stat -f (скопійовані дослівно з
 #      Sources/AndroidMoverCore/ADB/ADBClient.swift) — реальний вивід осідає в Tests/Golden/*.txt.
 #   4. Прибирає /sdcard/AndroidMoverE2E повністю (trap на EXIT — і при провалі теж).
@@ -21,9 +21,9 @@
 #   AM_DEVICE_SERIAL  — серійник пристрою. За замовчуванням — перший рядок зі станом
 #                        "device" з `adb devices`.
 #
-# Golden-файл, якого тут НЕМА: md5sum — checksum-верифікація реалізована у v0.11.0
-# (ADBClient.checksums), але крок захоплення ще не доданий; з'явиться разом з `amctl capture`
-# який замінить ручне копіювання скриптів у цей bash.
+# Golden-файл, якого тут нема: md5sum — checksum-верифікація (ADBClient.checksums) поки
+# без кроку захоплення; з'явиться разом з `amctl capture`, який замінить ручне копіювання
+# скриптів у цей bash.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
@@ -145,7 +145,7 @@ capture "recursive_files" \
 capture "recursive_dirs" \
   "AM_P=$AM_P_GOLDEN; if [ ! -e \"\$AM_P\" ]; then echo __AM_MISSING__; exit 0; fi; toybox find \"\$AM_P\" -type d -exec toybox stat -c '%Y|%n' {} + 2>/dev/null; exit 0"
 
-# statMTimes (ADBClient.statMTimes) — find (файли І теки, БЕЗ -type) + stat.
+# statMTimes (ADBClient.statMTimes) — find (файли і теки, без -type) + stat.
 capture "stat_mtimes" \
   "AM_P=$AM_P_GOLDEN; if [ ! -e \"\$AM_P\" ]; then echo __AM_MISSING__; exit 0; fi; toybox find \"\$AM_P\" -exec toybox stat -c '%Y|%n' {} + 2>/dev/null; exit 0"
 

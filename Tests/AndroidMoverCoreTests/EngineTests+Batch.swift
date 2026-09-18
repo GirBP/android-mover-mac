@@ -4,7 +4,7 @@ import XCTest
 
 extension EngineTests {
 
-    // MARK: - v0.10.2: батчі для плоских файлів (кейс власника: 1 222 .mp4 за один move)
+    // MARK: - Батчі для плоских файлів
 
     /// Усі argv-виклики mock (JSON-рядки MOCK_LOG_FILE) — без argv[0].
     func batchMockCalls(logFile: URL) throws -> [[String]] {
@@ -53,7 +53,7 @@ extension EngineTests {
         XCTAssertEqual(calls.filter { $0.contains("pull") }.count, 3, "3 батчевих pull, не 70")
         XCTAssertEqual(calls.filter { $0.joined(separator: " ").contains("-type f") }.count, 0,
                        "жодного find для плоских файлів — розмір беремо з лістингу")
-        // v0.15.0 (M3): батчеві скрипти впізнаються за опкодом, а не за текстом `for AM_P in`.
+        // Батчеві скрипти впізнаються за опкодом, а не за текстом `for AM_P in`.
         let shells = calls.map { $0.joined(separator: " ") }
         XCTAssertEqual(shells.filter { $0.hasPrefix("-s \(serial) shell AM_OP=rmBatch;") }.count, 3, "3 батчевих rm, не 70")
         XCTAssertEqual(shells.filter { $0.hasPrefix("-s \(serial) shell AM_OP=md5Batch;") }.count, 3, "3 батчевих md5 (move → beforeDelete), не 70")
@@ -114,7 +114,7 @@ extension EngineTests {
         let logFile = makeMockLogFile()
         let client = makeClient(extraEnv: ["MOCK_LOG_FILE": logFile.path])
         _ = try makeBatchFixture(count: 3)
-        // Вибір: [файл, файл, ТЕКА(DCIM), файл] — теки йдуть поштучно, файли — батчами.
+        // Вибір: [файл, файл, тека(DCIM), файл] — теки йдуть поштучно, файли — батчами.
         let batchEntries = try await client.listDirectory("\(remoteRoot!)/Batch", on: serial)
         let dcim = try await client.listDirectory("\(remoteRoot!)", on: serial).first { $0.name == "DCIM" }!
         let selection = [batchEntries[0], batchEntries[1], dcim, batchEntries[2]]

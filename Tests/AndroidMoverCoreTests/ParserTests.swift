@@ -90,7 +90,7 @@ final class ParserTests: XCTestCase {
         XCTAssertTrue(RemotePath.isUnsafeToDelete("/mnt/sdcard/DCIM"))
         XCTAssertTrue(RemotePath.isUnsafeToDelete("/sdcard/DCIM/../../system"))
         XCTAssertTrue(RemotePath.isUnsafeToDelete("sdcard/DCIM"))
-        // Корінь ЗНІМНОЇ SD-картки — точка монтування тому: rm -rf стер би всю картку.
+        // Корінь знімної SD-картки — точка монтування тому: rm -rf стер би всю картку.
         XCTAssertTrue(RemotePath.isUnsafeToDelete("/storage/AAAA-BBBB"))
         XCTAssertTrue(RemotePath.isUnsafeToDelete("/storage/1234-5678/"))
 
@@ -98,13 +98,13 @@ final class ParserTests: XCTestCase {
         XCTAssertFalse(RemotePath.isUnsafeToDelete("/sdcard/DCIM/Camera/IMG.jpg"))
         XCTAssertFalse(RemotePath.isUnsafeToDelete("/storage/emulated/0/Download/файл.zip"))
         XCTAssertFalse(RemotePath.isUnsafeToDelete("/storage/self/primary/DCIM"))
-        // Вміст УСЕРЕДИНІ знімної картки видаляти можна.
+        // Вміст усередині знімної картки видаляти можна.
         XCTAssertFalse(RemotePath.isUnsafeToDelete("/storage/AAAA-BBBB/DCIM"))
         XCTAssertFalse(RemotePath.isUnsafeToDelete("/storage/1234-5678/Download/файл.zip"))
     }
 
     func testAllowedPushTarget() {
-        // Дозволено писати В КОРІНЬ /sdcard чи /storage/... — на відміну від isUnsafeToDelete,
+        // Дозволено писати в корінь /sdcard чи /storage/... — на відміну від isUnsafeToDelete,
         // де сам корінь недоторканний.
         XCTAssertTrue(RemotePath.isAllowedPushTarget("/sdcard"))
         XCTAssertTrue(RemotePath.isAllowedPushTarget("/sdcard/"))
@@ -140,7 +140,7 @@ final class ParserTests: XCTestCase {
         XCTAssertFalse(entry.matches(query: "відео"))
     }
 
-    // MARK: - 2.4: adb track-devices frame parser
+    // MARK: - adb track-devices frame parser
 
     private static func trackFrame(_ payload: String) -> String {
         String(format: "%04x", payload.utf8.count) + payload
@@ -178,8 +178,8 @@ final class ParserTests: XCTestCase {
         XCTAssertTrue(remainderB.isEmpty)
     }
 
-    /// 2.4-фікс: сміття (не-hex байти) перед валідним кадром більше не блокує розбір навічно —
-    /// парсер відкидає його по байту і резинхронізується на початок реального кадру.
+    /// Сміття (не-hex байти) перед валідним кадром не блокує розбір навічно — парсер
+    /// відкидає його по байту і резинхронізується на початок реального кадру.
     func testParseTrackDevicesFramesResyncsPastGarbagePrefix() {
         let payload = "MOCK001\tdevice\n"
         var buffer = Data("!!!!!!!!".utf8) // 8 невалідних (не-hex) байтів перед кадром
@@ -191,11 +191,11 @@ final class ParserTests: XCTestCase {
         XCTAssertTrue(remainder.isEmpty)
     }
 
-    /// 2.4-фікс: запобіжник на >64 КБ буфера, з якого не вдалось розібрати ЖОДНОГО кадру —
-    /// вигаданий, але валідний на вигляд hex-префікс ("ffff" = 65535), що заявляє кадр,
-    /// більший за все, що прийшло: без запобіжника ресинхронізація не допомогла б (префікс
-    /// формально валідний, кадр просто "розрізаний між чанками" — `break`, не `continue`), і
-    /// буфер ріс би вічно, чекаючи payload, що ніколи повністю не прийде.
+    /// Запобіжник на >64 КБ буфера, з якого не вдалось розібрати жодного кадру — вигаданий,
+    /// але валідний на вигляд hex-префікс ("ffff" = 65535), що заявляє кадр, більший за все,
+    /// що прийшло: без запобіжника ресинхронізація не допомогла б (префікс формально валідний,
+    /// кадр просто "розрізаний між чанками" — `break`, не `continue`), і буфер ріс би вічно,
+    /// чекаючи payload, що ніколи повністю не прийде.
     func testParseTrackDevicesFramesClearsHugeUnresolvedBuffer() {
         var buffer = Data("ffff".utf8)
         buffer.append(Data(repeating: 0x41, count: 65_534)) // 'A' — будь-який наповнювач
@@ -244,7 +244,7 @@ final class ParserTests: XCTestCase {
         XCTAssertEqual(noExt2.lastPathComponent, "тека (1)")
     }
 
-    // MARK: - 1.3: попередження про збій виставлення дати створення
+    // MARK: - Попередження про збій виставлення дати створення
 
     func testDateWarningMessage() {
         XCTAssertNil(TransferEngine.dateWarning(failures: 0))
@@ -258,7 +258,7 @@ final class ParserTests: XCTestCase {
         )
     }
 
-    // MARK: - 1.7: round-trip shellQuote через реальний /bin/sh
+    // MARK: - Round-trip shellQuote через реальний /bin/sh
 
     /// Для 30 "ворожих" імен (той самий генератор, що EngineTests.testFuzzNamesRoundTrip...)
     /// `sh -c "printf '%s' <shellQuote(name)>"` мусить надрукувати ім'я побайтово незмінним —
@@ -280,10 +280,9 @@ final class ParserTests: XCTestCase {
         }
     }
 
-    /// v0.10.3: перевірка вільного місця не має падати на томах, де ImportantUsage = 0
-    /// (exFAT/NTFS/SMB — реальний кейс власника: зовнішній exFAT з 200 ГБ вільного місця
-    /// давав «вільно 0 B» і відмову ще до старту). Хелпер віддає позитивне число для будь-якого
-    /// живого тому і ніколи не трактує 0 як «диск повний».
+    /// Перевірка вільного місця не має падати на томах, де ImportantUsage = 0 (exFAT/NTFS/SMB
+    /// повертають 0 і давали б «вільно 0 B» та відмову ще до старту). Хелпер віддає позитивне
+    /// число для будь-якого живого тому і ніколи не трактує 0 як «диск повний».
     func testAvailableCapacityIsPositiveForTemporaryDirectory() {
         let capacity = TransferEngine.availableCapacity(at: FileManager.default.temporaryDirectory)
         XCTAssertNotNil(capacity)

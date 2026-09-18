@@ -1,12 +1,11 @@
 import SwiftUI
 import AndroidMoverCore
 
-/// Нижня панель BrowserView («Куди:», вибрано, превʼю, дії) — винесено з BrowserView.swift (≤400).
+/// Нижня панель BrowserView («Куди:», вибрано, превʼю, дії) — винесено з BrowserView.swift.
 extension BrowserView {
     var bottomBar: some View {
         HStack(spacing: 12) {
-            // v0.10.3: явне «Куди:» + меню всіх збережених тек — власник не розумів, що це за
-            // лейба і як вибрати теку (галочка в сайдбарі неочевидна).
+            // Явне «Куди:» + меню всіх збережених тек, а не галочка в сайдбарі.
             Menu {
                 ForEach(state.transfers.destinations, id: \.path) { url in
                     Button {
@@ -89,7 +88,7 @@ extension BrowserView {
                 Label("Копіювати", systemImage: "doc.on.doc")
             }
             .disabled(!state.transfers.canTransfer)
-            // v0.10.2: неактивна кнопка пояснює ЧОМУ (підказка при наведенні).
+            // Неактивна кнопка пояснює чому (підказка при наведенні).
             .help(state.transfers.transferDisabledReason ?? String(localized: "Скопіювати вибране на Mac (⌘⇧C)"))
 
             Button {

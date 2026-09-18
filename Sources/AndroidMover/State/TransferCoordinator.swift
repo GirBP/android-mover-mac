@@ -3,15 +3,15 @@ import Observation
 import Foundation
 import AndroidMoverCore
 
-/// 2.1: черга операцій перенесення/push — раніше жила в AppState (назва `TransferCoordinator`,
-/// щоб не конфліктувати з Foundation.OperationQueue). Тримає СИЛЬНІ (однонапрямні) посилання
-/// на DeviceStore/BrowserStore для client/serial/selection/currentPath; історія (A5) теж тут.
+/// Черга операцій перенесення/push (назва `TransferCoordinator`, щоб не конфліктувати з
+/// Foundation.OperationQueue). Тримає сильні однонапрямні посилання на DeviceStore/
+/// BrowserStore для client/serial/selection/currentPath; історія операцій теж тут.
 ///
-/// 3.3: цей файл — ядро (destination(s), canTransfer/canPush, requestTransfer, історія).
+/// Цей файл — ядро (destination(s), canTransfer/canPush, requestTransfer, історія).
 /// `queue`-механіка (enqueueTransfer/enqueuePush/cancel(id:)/remove(id:)/clearFinished(),
-/// послідовний запуск) — TransferQueue.swift, той самий тип, інший файл (як 2.8 розбило
-/// ADBClient/TransferEngine по файлах). `OperationItem` (обгортка над TransferSession/
-/// PushSession для однорідного масиву `queue`) — OperationItem.swift.
+/// послідовний запуск) — TransferQueue.swift, той самий тип, інший файл. `OperationItem`
+/// (обгортка над TransferSession/PushSession для однорідного масиву `queue`) —
+/// OperationItem.swift.
 @MainActor
 @Observable
 final class TransferCoordinator {
@@ -24,55 +24,56 @@ final class TransferCoordinator {
             sweepDestination()
         }
     }
-    /// 3.1: кілька збережених тек призначення на Mac (sidebar, секція "Mac") — `destination`
+    /// Кілька збережених тек призначення на Mac (sidebar, секція "Mac") — `destination`
     /// лишається "активною" текою серед них. Персистується окремо (масив шляхів, порядок
-    /// додавання) від "destinationPath" — той ключ і далі тримає лише АКТИВНУ теку, для
+    /// додавання) від "destinationPath" — той ключ і далі тримає лише активну теку, для
     /// зворотної сумісності зі старими версіями, що читали лише його.
     var destinations: [URL] = []
     var confirmingMove = false
-    /// v0.11.0 (P5): токен `ProcessInfo.beginActivity` (idle sleep вимкнено), доки є активна операція.
+    /// Токен `ProcessInfo.beginActivity` (idle sleep вимкнено), доки є активна операція.
     @ObservationIgnored var sleepActivity: NSObjectProtocol?
-    /// v0.10.1 (перф-фікс, п.5): к-ть елементів для confirmationDialog "Перемістити N елем.",
-    /// ЗАФІКСОВАНА в момент requestTransfer(move: true) — раніше BrowserView.swift читав
-    /// `state.browser.visibleSelection.count` НАПРЯМУ в title-параметрі, підв'язаному до
-    /// `mainContent` (весь table+pathBar+bottomBar) — будь-яка зміна selection/entries/
-    /// filterText інвалідовувала ввесь mainContent заради рядка, що здебільшого не показаний.
+    /// К-ть елементів для confirmationDialog "Перемістити N елем.", зафіксована в момент
+    /// requestTransfer(move: true) — не читається напряму з
+    /// `state.browser.visibleSelection.count` у title-параметрі, бо той підв'язаний до
+    /// `mainContent` (весь table+pathBar+bottomBar): будь-яка зміна selection/entries/
+    /// filterText інвалідовувала б увесь mainContent заради рядка, що здебільшого не
+    /// показаний.
     private(set) var pendingMoveCount = 0
 
-    /// 3.3: черга операцій (Safari Downloads-стиль) — замість одиничних `transfer`/`push`.
+    /// Черга операцій (Safari Downloads-стиль) — замість одиничних `transfer`/`push`.
     /// Виконання послідовне: `TransferQueue.runNextIfNeeded()` стартує щонайбільше один
     /// елемент одночасно, решта чекають зі станом `.pending` (`OperationItem.rowState`).
     var queue: [OperationItem] = []
-    /// 3.3: чи розгорнута `OperationQueuePanel` — авто-розгортається при постановці нового
+    /// Чи розгорнута `OperationQueuePanel` — авто-розгортається при постановці нового
     /// елемента в чергу (enqueueTransfer/enqueuePush), користувач може згорнути вручну; після
     /// цього лишається згорнутою, доки не додасться щось нове.
     var isQueuePanelExpanded = true
 
-    /// 2.2: сигнал DeviceStore-у "transfer закінчився" — задається в AppState.init як
+    /// Сигнал DeviceStore-у "transfer закінчився" — задається в AppState.init як
     /// `devices.flushPendingFrame` (слабко захоплений DeviceStore, як і решта міжсховищних
     /// замикань). DeviceStore заморожує кадри track-devices, доки `isOperationActive()`
-    /// (3.3: `hasActiveTransfer`, TransferQueue.swift) каже true; цей виклик публікує
-    /// найсвіжіший накопичений кадр, щойно АКТИВНИЙ transfer справді завершився (викликається
-    /// з середини `enqueueTransfer`, не з push — та сама умова, що й раніше).
+    /// (`hasActiveTransfer`, TransferQueue.swift) каже true; цей виклик публікує найсвіжіший
+    /// накопичений кадр, щойно активний transfer справді завершився — викликається з
+    /// середини `enqueueTransfer`, не з push.
     var onOperationEnded: (() -> Void)?
 
-    // Історія операцій (A5): JSON Lines у Application Support, спільна для всіх вікон.
+    // Історія операцій: JSON Lines у Application Support, спільна для всіх вікон.
     let historyStore = HistoryStore(fileURL: HistoryStore.defaultURL)
 
-    /// v0.11.0 (P4): журнал НЕЗАВЕРШЕНИХ операцій — відновлення після краху/kill/вимкнення.
+    /// Журнал незавершених операцій — відновлення після краху/kill/вимкнення.
     let journal = OperationJournal(fileURL: OperationJournal.defaultURL)
     /// Записи, що потребують відновлення (банер RecoveryBanner). Завантажується на старті і
     /// після кожної завершеної операції.
     var recoverable: [JournalRecord] = []
-    /// Записи операцій, що ВИКОНУЮТЬСЯ в цій сесії — не «незавершені з минулого», банер їх не показує.
+    /// Записи операцій, що виконуються в цій сесії — не «незавершені з минулого», банер їх не показує.
     @ObservationIgnored var activeJournalIDs = Set<UUID>()
     /// Повідомлення банера відновлення («підключіть телефон X»), nil — усе гаразд.
     var recoveryMessage: String?
 
-    /// Аудит-фікс (п.5а): реєстр УСІХ живих координаторів (одне вікно — один координатор) —
+    /// Реєстр усіх живих координаторів (одне вікно — один координатор) —
     /// AppDelegate.applicationShouldTerminate (Sources/AndroidMover/AppDelegate.swift)
-    /// перевіряє чергу КОЖНОГО вікна перед виходом з додатка, не лише активного.
-    /// `.weakObjects()`: реєстрація НЕ тримає координатор живим — закрите вікно (і його
+    /// перевіряє чергу кожного вікна перед виходом з додатка, не лише активного.
+    /// `.weakObjects()`: реєстрація не тримає координатор живим — закрите вікно (і його
     /// AppState) звільняється як завжди, сам випадає з реєстру.
     static let live = NSHashTable<TransferCoordinator>.weakObjects()
 
@@ -96,7 +97,7 @@ final class TransferCoordinator {
         observeVolumeChanges()
     }
 
-    /// 1.5: sweep сиріт на диску призначення — викликається і з `destination`.didSet (щойно
+    /// Sweep сиріт на диску призначення — викликається і з `destination`.didSet (щойно
     /// обрана тека), і окремо з AppState.bootstrap() (didSet НЕ спрацьовує для значення,
     /// відновленого прямим присвоєнням усередині init — Swift не викликає спостерігачі
     /// властивості під час її ж власного init). Best-effort, фонова черга, ніколи не блокує UI.
@@ -108,7 +109,7 @@ final class TransferCoordinator {
         }
     }
 
-    // MARK: - 3.1: кілька тек призначення на Mac (sidebar)
+    // MARK: - Кілька тек призначення на Mac (sidebar)
 
     private static let destinationsKey = "destinationPaths"
 
@@ -127,8 +128,7 @@ final class TransferCoordinator {
     }
 
     /// Додає теку в збережений список (fileImporter "Обрати теку…" у sidebar чи drag&drop
-    /// із Finder туди ж) і, за замовчуванням, одразу робить її активною (`destination`) — та
-    /// сама поведінка, що раніше мала кнопка "Тека на Mac…" у bottomBar.
+    /// із Finder туди ж) і, за замовчуванням, одразу робить її активною (`destination`).
     func addDestination(_ url: URL, makeActive: Bool = true) {
         if !destinations.contains(where: { $0.path == url.path }) {
             destinations.append(url)
@@ -147,27 +147,26 @@ final class TransferCoordinator {
 
     // MARK: - Похідний стан
 
-    /// 3.3: більше НЕ гейтується активною операцією (`transfer == nil && push == nil` пішло
-    /// разом з одиночними сесіями) — лише вибір/пристрій/призначення. Додавати в чергу можна
-    /// й посеред виконання іншої операції.
-    /// Аудит-фікс (п.4): `visibleSelection`, не голий `selection` — кнопка/меню "Копіювати"/
-    /// "Перемістити" не активуються, коли вибрані елементи всі приховані (тумблером/фільтром);
-    /// `startTransfer` однаково бере `selectedEntries` (теж уже `visibleSelection`), тож без
-    /// цього кнопка була б "увімкнена", але нічого не робила б.
+    /// Не гейтується активною операцією — лише вибір/пристрій/призначення. Додавати в чергу
+    /// можна й посеред виконання іншої операції.
+    /// `visibleSelection`, не голий `selection` — кнопка/меню "Копіювати"/"Перемістити" не
+    /// активуються, коли вибрані елементи всі приховані (тумблером/фільтром); `startTransfer`
+    /// однаково бере `selectedEntries` (теж уже `visibleSelection`), тож без цього кнопка
+    /// була б "увімкнена", але нічого не робила б.
     var canTransfer: Bool {
         deviceStore.stage == .ready && !browserStore.visibleSelection.isEmpty && destination != nil
             && destinationProblem == nil
     }
 
-    /// v0.10.3: чому активна тека призначення непридатна (диск від'єднано, лише читання), або nil.
+    /// Чому активна тека призначення непридатна (диск від'єднано, лише читання), або nil.
     var destinationProblem: String? {
         destination.flatMap { cachedProblem(for: $0) }
     }
 
-    // v0.12.2 (M1, аудит M6): `problem(for:)` робить синхронні fileExists/isWritableFile — на
-    // зовнішньому диску, що заснув, чи на мережевому томі це блокує main, а викликалось воно
-    // ~9 разів на кожен рендер нижньої панелі й на кожен рядок секції «Mac». Тепер результат
-    // живе ~2 с і скидається за подіями монтування/розмонтування томів.
+    // `problem(for:)` робить синхронні fileExists/isWritableFile — на зовнішньому диску, що
+    // заснув, чи на мережевому томі це блокує main, а викликається ~9 разів на кожен рендер
+    // нижньої панелі й на кожен рядок секції «Mac». Результат живе ~2 с і скидається за
+    // подіями монтування/розмонтування томів.
     @ObservationIgnored private var problemCache: [String: (checkedAt: Date, problem: String?)] = [:]
     @ObservationIgnored nonisolated(unsafe) private var volumeObservers: [any NSObjectProtocol] = []
     private static let problemCacheTTL: TimeInterval = 2
@@ -209,8 +208,8 @@ final class TransferCoordinator {
         return nil
     }
 
-    /// v0.10.2: чому «Копіювати/Перемістити» неактивні — для `.help` на кнопках і в меню;
-    /// nil, коли активні. Той самий порядок перевірок, що в canTransfer.
+    /// Чому «Копіювати/Перемістити» неактивні — для `.help` на кнопках і в меню; nil, коли
+    /// активні. Той самий порядок перевірок, що в canTransfer.
     var transferDisabledReason: String? {
         if deviceStore.stage != .ready { return String(localized: "Підключіть телефон") }
         if browserStore.visibleSelection.isEmpty { return String(localized: "Виберіть файли або теки в таблиці") }
@@ -219,8 +218,8 @@ final class TransferCoordinator {
         return nil
     }
 
-    /// 3.3: те саме послаблення, що й canTransfer — push більше не блокується активною
-    /// operацією, лише готовністю пристрою.
+    /// Те саме послаблення, що й canTransfer — push не блокується активною операцією, лише
+    /// готовністю пристрою.
     var canPush: Bool {
         deviceStore.stage == .ready
     }
@@ -251,14 +250,14 @@ final class TransferCoordinator {
     // MARK: - Push Mac → Android (B1)
 
     /// `urls` — файли й/або теки з Finder (кнопка «На телефон…» чи дроп у таблицю). Ціль push
-    /// — ПОТОЧНА відкрита тека телефона на момент виклику (знімок, як і destination вище —
+    /// — поточна відкрита тека телефона на момент виклику (знімок, як і destination вище —
     /// елемент у черзі не "пливе" за подальшою навігацією користувача по телефону).
     func requestPush(urls: [URL]) {
         guard canPush, !urls.isEmpty, let device = deviceStore.activeDevice else { return }
         enqueuePush(urls: urls, destDir: browserStore.currentPath, serial: device.serial, deviceLabel: device.displayName)
     }
 
-    // MARK: - Історія операцій (A5)
+    // MARK: - Історія операцій
 
     /// Поважає тумблер «Вести історію операцій» (Settings, @AppStorage "history.enabled");
     /// best-effort — `try?` ніколи не блокує основний флоу. Internal (не private) — FileActions

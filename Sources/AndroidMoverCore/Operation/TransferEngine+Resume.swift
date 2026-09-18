@@ -1,9 +1,9 @@
 import Foundation
 
-/// B2: докачка після обриву — перша спроба (pull цілого елемента) і цикл дотягування
+/// Докачка після обриву — перша спроба (pull цілого елемента) і цикл дотягування
 /// відсутніх/битих файлів, коли перша спроба чи наступна verify провалились.
 extension TransferEngine {
-    /// B2: спить `seconds`, перевіряючи cancellation.isCancelled кожні ≤100 мс, замість одного суцільного
+    /// Спить `seconds`, перевіряючи cancellation.isCancelled кожні ≤100 мс, замість одного суцільного
     /// Task.sleep(seconds) — інакше cancel() посеред retryDelay (що зростає зі спробою, до
     /// кількох секунд) чекав би до кінця паузи, перш ніж скасування взагалі помітили б.
     /// Кидає ADBError.cancelled щойно прапор піднявся, не чекаючи штатного кінця сну.
@@ -32,7 +32,7 @@ extension TransferEngine {
         var snapshot = progress
         snapshot.phase = .pulling
         let poller = Task.detached { [snapshot, fileManager] in
-            // 1.4: адаптивний інтервал — на великих деревах (напр. 50k файлів) сам обхід
+            // Адаптивний інтервал — на великих деревах (напр. 50k файлів) сам обхід
             // itemTmp коштує помітний час; якщо один прохід зайняв > 200 мс, наступний тік
             // рідший (3 с), щоб не марнувати CPU/IO на постійний рескан того самого дерева,
             // що росте. Малі елементи лишаються на щосекундному тіку — там обхід майже
@@ -69,18 +69,18 @@ extension TransferEngine {
         }
     }
 
-    /// B2: дотягує лише відсутні/биті файли елемента після провалу pull або verify — порівнює
+    /// Дотягує лише відсутні/биті файли елемента після провалу pull або verify — порівнює
     /// локальну мапу (той самий localFileMap(), яким користується verify) з очікуваною і для
-    /// кожної розбіжності перепулює САМЕ той файл, а не весь елемент заново. Биту/часткову
+    /// кожної розбіжності перепулює саме той файл, а не весь елемент заново. Биту/часткову
     /// локальну копію файла перед цим видаляє. Зайві локальні файли (яких нема серед
     /// очікуваних) теж прибирає — інакше вони зіб'ють count у наступній verify().
     /// Одиночний файл-елемент (relative == "") — перепул усього itemTmp.
     ///
-    /// ІНВАРІАНТ: шляхи, якими ми звертаємось ДО ТЕЛЕФОНА (client.pull) і якими будуємо
-    /// ЛОКАЛЬНИЙ шлях файла (localRoot.appendingPathComponent) — це САМІ БАЙТИ з телефонного
-    /// лістингу (rawRelative), НІКОЛИ unicode-нормалізовані. Телефон (ext4/FUSE) шукає ім'я
+    /// Інваріант: шляхи, якими ми звертаємось до телефона (client.pull) і якими будуємо
+    /// локальний шлях файла (localRoot.appendingPathComponent) — це самі байти з телефонного
+    /// лістингу (rawRelative), ніколи unicode-нормалізовані. Телефон (ext4/FUSE) шукає ім'я
     /// байт-у-байт: файл із NFD-іменем на телефоні неможливо докачати за NFC-шляхом. Ключ
-    /// normalizedKey — ЛИШЕ індекс для звірки з localFileMap (яка сама нормалізує ключі, бо
+    /// normalizedKey — лише індекс для звірки з localFileMap (яка сама нормалізує ключі, бо
     /// APFS нормалізаційно-нечутлива) — він ніколи не йде як шлях ні на телефон, ні у
     /// FileManager для нового/докачаного файла. Видалення "зайвих" локальних файлів — за
     /// ключами localFileMap (тобто нормалізованими) навмисно лишається як є: це вже локальний
@@ -145,15 +145,15 @@ extension TransferEngine {
         }
     }
 
-    /// B2: цикл докачки після провалу першої спроби (pull кинув помилку, не cancelled, АБО
+    /// Цикл докачки після провалу першої спроби (pull кинув помилку, не cancelled, або
     /// наступна verify не збіглась). Лише помилки зв'язку з телефоном (ADBError —
     /// pull/verify/timeout/commandFailed/pullProducedNothing тощо) виправдовують докачку:
-    /// джерело на телефоні ціле, варто почекати на пристрій і спробувати ще. Будь-яка ІНША
+    /// джерело на телефоні ціле, варто почекати на пристрій і спробувати ще. Будь-яка інша
     /// помилка (напр. CocoaError від moveItem у finishAfterPull — колізія імен, брак прав)
     /// кидається одразу — чекати на пристрій і докачувати тут нема сенсу. Кожна спроба чекає
     /// повернення пристрою, тоді дотягує лише відсутнє/бите (`resumeMissing`) і верифікує
     /// знову; до `maxAttempts` спроб (верифікаційні провали — до `verificationAttemptCap`).
-    /// Джерело на телефоні НІКОЛИ тут не чіпається.
+    /// Джерело на телефоні тут ніколи не чіпається.
     func resumeAfterFailedAttempt(
         entry: RemoteEntry,
         expected: [RemoteFileRecord],
@@ -166,17 +166,17 @@ extension TransferEngine {
         onProgress: @escaping @Sendable (TransferProgress) -> Void
     ) async throws -> (url: URL, dateFailures: Int, verified: VerifiedManifest) {
         guard Self.isResumable(firstError) else { throw firstError }
-        // v0.11.0 (P6): якщо джерела на телефоні вже нема — чекати й докачувати нема чого;
-        // одна дешева перевірка замість 15 спроб × 120 с.
+        // Якщо джерела на телефоні вже нема — чекати й докачувати нема чого; одна дешева
+        // перевірка замість 15 спроб × 120 с.
         if !Self.isVerificationError(firstError), (try? await client.remoteExists(entry.path, on: serial)) == false {
             throw ADBError.remoteMissing(entry.path)
         }
-        // v0.11.0 (P7): очікувана мапа може застаріти (файл дописується на телефоні під час
-        // переносу) — після другого верифікаційного провалу перечитуємо її з телефона.
+        // Очікувана мапа може застаріти (файл дописується на телефоні під час переносу) —
+        // після другого верифікаційного провалу перечитуємо її з телефона.
         var expected = expected
         var lastError = firstError
         var attempt = 1
-        // P6: верифікаційні провали — до verificationAttemptCap, транспортні — до maxAttempts.
+        // Верифікаційні провали — до verificationAttemptCap, транспортні — до maxAttempts.
         while attempt <= (Self.isVerificationError(lastError) ? min(maxAttempts, Self.verificationAttemptCap) : maxAttempts) {
             if cancellation.isCancelled { throw ADBError.cancelled }
             progress.phase = .waitingForDevice
@@ -194,12 +194,12 @@ extension TransferEngine {
             }
             if cancellation.isCancelled { throw ADBError.cancelled }
 
-            // Пауза перед докачкою спить ШМАТКАМИ (≤100 мс), перевіряючи cancellation.isCancelled між
+            // Пауза перед докачкою спить шматками (≤100 мс), перевіряючи cancellation.isCancelled між
             // ними — інакше довгий retryDelay (росте зі спробою) тримав би cancel() у
             // блокуванні аж до кінця всієї паузи.
             try await sleepCancellably(retryDelay(attempt))
 
-            // P7: другий поспіль верифікаційний провал — перечитати розміри з телефона
+            // Другий поспіль верифікаційний провал — перечитати розміри з телефона
             // (файл міг дописатись після лістингу); далі докачка вже проти свіжої мапи.
             if attempt >= 2, Self.isVerificationError(lastError),
                let refreshed = try? await client.recursiveFiles(entry.path, on: serial, onSpawn: cancellation.trackProcess) {
@@ -228,12 +228,12 @@ extension TransferEngine {
     }
 
     /// Спільний хвіст перенесення елемента: дати → verify → атомарний move у призначення.
-    /// Викликається і після першої спроби pull, і після кожного успішного resumeMissing (B2) —
+    /// Викликається і після першої спроби pull, і після кожного успішного resumeMissing —
     /// жодних відмінностей у поведінці між цими шляхами.
-    /// v0.11.0 (P1): після розмірної verify — md5 (`checksumRequired`): `remoteChecksums` —
-    /// заздалегідь знятий батчем словник (батчевий шлях) або nil → один виклик на елемент.
-    /// Файли з розбіжністю видаляються локально і кидається checksumMismatch (resumable) —
-    /// докачка перепулює лише їх.
+    /// Після розмірної verify — md5 (`checksumRequired`): `remoteChecksums` — заздалегідь
+    /// знятий батчем словник (батчевий шлях) або nil → один виклик на елемент. Файли з
+    /// розбіжністю видаляються локально і кидається checksumMismatch (resumable) — докачка
+    /// перепулює лише їх.
     func finishAfterPull(
         entry: RemoteEntry,
         expected: [RemoteFileRecord],
@@ -289,8 +289,8 @@ extension TransferEngine {
         try fileManager.moveItem(at: pulled, to: finalURL)
 
         if dateFailures > 0 {
-            // Не фатально: файли на місці, лише частина creationDate не виставилась. 1.3:
-            // окрім NSLog для розробника — число йде й нагору, у TransferItemResult.warning,
+            // Не фатально: файли на місці, лише частина creationDate не виставилась. Окрім
+            // NSLog для розробника — число йде й нагору, у TransferItemResult.warning,
             // де його побачить користувач.
             NSLog("AndroidMover: не вдалося виставити creationDate для \(dateFailures) файлів у \(finalURL.path)")
         }

@@ -2,10 +2,10 @@ import Foundation
 import Observation
 import AndroidMoverCore
 
-/// 2.1: навігація, лістинг, сортування/фільтр, вільне місце — раніше жило в AppState.
-/// Тримає СИЛЬНЕ (однонапрямне, без циклу) посилання на DeviceStore, щоб читати
-/// client/activeDevice; сам про пристрій нічого не питає — DeviceStore сигналізує через
-/// deviceWasExplicitlySelected()/devicesContextDidChange(), а не власним `adb devices`.
+/// Керує навігацією, лістингом, сортуванням і фільтром, вільним місцем на пристрої.
+/// Тримає сильне однонапрямне посилання на DeviceStore, щоб читати client/activeDevice;
+/// про пристрій не питає сам — DeviceStore сигналізує через deviceWasExplicitlySelected()/
+/// devicesContextDidChange(), а не власним `adb devices`.
 @MainActor
 @Observable
 final class BrowserStore {
@@ -13,43 +13,38 @@ final class BrowserStore {
 
     var currentPath = "/sdcard"
     var pathField = "/sdcard"
-    // Аудит-фікс (п.4): при КОЖНІЙ зміні — виділення обмежується тим, що ще видиме.
-    // v0.10.1 (перф-фікс, п.1/12): didSet планує перебудову `index` (scheduleIndexRebuild
-    // нижче) замість перерахунку похідних властивостей на кожен доступ; сама перебудова й
-    // обрізає selection наприкінці.
+    // Виділення завжди обмежується видимим після кожної зміни entries. didSet планує
+    // перебудову `index` (scheduleIndexRebuild нижче) замість перерахунку похідних
+    // властивостей на кожен доступ; сама перебудова й обрізає selection наприкінці.
     var entries: [RemoteEntry] = [] {
         didSet { scheduleIndexRebuild() }
     }
     var isLoading = false
     var listError: String?
-    // Аудит-фікс (high): didSet тепер оновлює закешований `selectionSummary` (нижче) РАЗ, на
-    // реальну зміну виділення — не при кожному читанні з bottomBar.
+    // didSet оновлює закешований `selectionSummary` (нижче) лише на реальну зміну
+    // виділення — не при кожному читанні з bottomBar.
     var selection = Set<String>() {
         didSet {
             guard selection != oldValue else { return }
             refreshSelectionSummary()
         }
     }
-    // 3.8: сортування переживає перезапуск — персиститься в UserDefaults як пара
-    // (поле, зростання), бо KeyPathComparator сам по собі не Codable. Дефолт відновлює
-    // збережене на момент конструювання (BrowserStore.loadSortOrder(), MARK: - Персистенція).
-    // v0.10.1: didSet тепер ще й планує перебудову index (нова сортувальна спеца).
+    // Сортування переживає перезапуск — персиститься в UserDefaults як пара (поле,
+    // зростання), бо KeyPathComparator сам по собі не Codable. Дефолт відновлює
+    // збережене на момент конструювання (BrowserStore.loadSortOrder(), MARK: -
+    // Персистенція). didSet планує перебудову index.
     var sortOrder: [KeyPathComparator<RemoteEntry>] = BrowserStore.loadSortOrder() {
         didSet {
             BrowserStore.persistSortOrder(sortOrder)
             scheduleIndexRebuild()
         }
     }
-    // 3.5: тумблер прихованих файлів (default off) — `.androidmover-tmp-*` ховається
-    // ЗАВЖДИ, незалежно від цього прапорця.
-    // v0.10.1: showHidden НЕ міняє порядок, лише видимість — дешева refiltered() (без
-    // пересортування, без повного scheduleIndexRebuild()).
-    // Аудит-фікс (medium): і ця refiltered(), і filterText нижче, планують її ОФФ-main
-    // (scheduleRefilter()) — раніше кликали `index.refiltered(...)` СИНХРОННО на MainActor
-    // у тілі didSet, тобто на КОЖЕН натиск клавіші в пошуку весь ICU-прохід
-    // (`localizedCaseInsensitiveContains` на кожен видимий елемент, до 50k) блокував головний
-    // потік (виміряно: ~55-60мс на 50k, і DEBUG, і RELEASE — 3+ пропущені кадри на
-    // keystroke).
+    // Тумблер прихованих файлів (типово вимкнено); `.androidmover-tmp-*` ховається
+    // завжди, незалежно від прапорця. showHidden не змінює порядок — лише дешева
+    // refiltered() без пересортування. Фільтрація завжди йде поза main
+    // (scheduleRefilter()): синхронний виклик на кожен натиск клавіші блокує потік —
+    // ICU-прохід (`localizedCaseInsensitiveContains` на елемент, до 50k) займає
+    // ~55-60 мс і в DEBUG, і в RELEASE, тобто губить 3+ кадри на keystroke.
     var showHidden = UserDefaults.standard.bool(forKey: "browser.showHidden") {
         didSet {
             UserDefaults.standard.set(showHidden, forKey: "browser.showHidden")
@@ -60,40 +55,38 @@ final class BrowserStore {
     // й пише обидва — refreshList/pollTick/deviceWasExplicitlySelected/devicesContextDidChange.
     var lastListedKey: String?
     var listGeneration = 0
-    // v0.10.1: генерація перебудови index — Task.detached (scheduleIndexRebuild) міг
-    // стартувати на застарілому знімку entries; MainActor.run звіряє це значення і
-    // відкидає застарілий build, якщо стартувала новіша.
+    // Генерація перебудови index: Task.detached (scheduleIndexRebuild) може стартувати
+    // на застарілому знімку entries; MainActor.run звіряє це значення і відкидає
+    // застарілий build, якщо стартувала новіша.
     private var indexGeneration = 0
-    // Аудит-фікс (критично): true від моменту, коли scheduleIndexRebuild() СТАРТУВАВ
-    // асинхронну побудову (Task.detached), і аж до приземлення MainActor.run — BrowserView
-    // гейтить спінер і на це, не лише на isLoading (BrowserView.swift, overlay). Інакше є
-    // вікно (виміряно ~80-300мс на 50k) де entries/isLoading вже вказують на НОВУ теку, а
-    // `index` (і, відповідно, filteredEntries/selectedEntries/byID, куди йдуть клік і
-    // Cmd+A) ще старий — таблиця показує вміст СТАРОЇ теки чи хибне "Нічого не знайдено" на
-    // реально непорожній.
+    // true від моменту, коли scheduleIndexRebuild() запускає асинхронну побудову
+    // (Task.detached), і до приземлення MainActor.run. BrowserView гейтить спінер і на
+    // це, не лише на isLoading (BrowserView.swift, overlay) — інакше є вікно (~80-300 мс
+    // на 50k), де entries/isLoading вже вказують на нову теку, а `index` (і похідні
+    // filteredEntries/selectedEntries/byID, куди йдуть клік і Cmd+A) ще старий: таблиця
+    // показує вміст старої теки або хибне «Нічого не знайдено» на непорожній.
     private(set) var isIndexBuilding = false
-    // Аудит-фікс (medium): генерація scheduleRefilter() — той самий "останній старт
-    // виграє" патерн, що indexGeneration вище, але для дешевшого шляху filterText/
-    // showHidden (без повного пересорту).
+    // Генерація scheduleRefilter() — той самий патерн «останній старт виграє», що
+    // indexGeneration вище, але для дешевшого шляху filterText/showHidden без повного
+    // пересорту.
     private var filterGeneration = 0
     @ObservationIgnored
     private nonisolated(unsafe) var refilterTask: Task<Void, Never>?
 
-    // 3.1: обране на телефоні — теки, додані користувачем для АКТИВНОГО пристрою. У пам'яті
-    // тримається лише список поточного serial (перезавантажується при зміні пристрою, нижче);
-    // персиститься per-serial у UserDefaults, щоб не змішувати обране різних телефонів.
+    // Обране на телефоні — теки, додані користувачем для активного пристрою. У пам'яті
+    // тримається лише список поточного serial (перезавантажується при зміні пристрою,
+    // нижче); персиститься per-serial у UserDefaults, щоб не змішувати обране різних
+    // телефонів.
     var favorites: [String] = []
 
-    // 1.5: sweep сиріт (.androidmover-tmp-*) на телефоні — раз на serial|path за сесію.
+    // Sweep сиріт (.androidmover-tmp-*) на телефоні — раз на serial|path за сесію.
     // internal (не private): sweepRemoteOrphansIfNeeded — BrowserStore+Navigation.swift.
     var sweptRemoteKeys = Set<String>()
 
-    // Пошук/фільтр по імені в поточній теці (A1).
-    // Аудит-фікс (п.4): приховане фільтром знімається з виділення — інваріант "деструктивні
-    // дії лише над тим, що користувач БАЧИТЬ" (як у Finder).
-    // v0.10.1 (перф-фікс, п.2/4): та сама дешева refiltered(), що showHidden вище — жодного
-    // пересортування 50k елементів на КОЖЕН натиск клавіші (як робив старий
-    // sortedEntries.filter(...) на кожен доступ).
+    // Пошук/фільтр по імені в поточній теці. Приховане фільтром знімається з
+    // виділення — інваріант «деструктивні дії лише над тим, що користувач бачить» (як у
+    // Finder). Та сама дешева refiltered(), що showHidden вище — без пересортування 50k
+    // елементів на кожен натиск клавіші.
     var filterText: String = "" {
         didSet {
             guard filterText != oldValue else { return }
@@ -101,7 +94,7 @@ final class BrowserStore {
         }
     }
 
-    // Вільне місце телефона (A2).
+    // Вільне місце телефона.
     var storageInfo: RemoteStorageInfo?
     // internal (не private): refreshStorageInfo/deviceWasExplicitlySelected/
     // devicesContextDidChange — BrowserStore+Navigation.swift.
@@ -111,8 +104,8 @@ final class BrowserStore {
     // internal (не private): deviceWasExplicitlySelected/devicesContextDidChange —
     // BrowserStore+Navigation.swift.
     var lastKnownActiveSerial: String?
-    /// v0.14.0: ключ обраного, під яким воно зараз завантажене (перечитати, коли ідентичність
-    /// того самого serial щойно резолвилась: unauthorized → ready).
+    /// Ключ обраного, під яким воно зараз завантажене — перечитати, коли ідентичність
+    /// того самого serial щойно резолвилась: unauthorized → ready.
     var lastFavoritesKey: String?
     // @ObservationIgnored + nonisolated(unsafe): те саме обґрунтування, що й
     // DeviceStore.trackTask — deinit мусить скасувати Task синхронно, поза MainActor.
@@ -120,13 +113,13 @@ final class BrowserStore {
     @ObservationIgnored
     nonisolated(unsafe) var pollTask: Task<Void, Never>?
 
-    /// 3.3: TransferCoordinator підключає тут `hasActiveTransfer` (TransferQueue.swift, в
-    /// AppState.init) — щоб поллер листингу не турбував теку, доки в черзі активний саме
-    /// transfer (НЕ push), точнісінько як стара умова одиночного `transfer == nil`.
+    /// TransferCoordinator підключає тут `hasActiveTransfer` (TransferQueue.swift, в
+    /// AppState.init), щоб поллер листингу не турбував теку, доки в черзі активний саме
+    /// transfer, а не push.
     var isOperationActive: () -> Bool = { false }
 
-    // 3.7: String(localized:) — SidebarView показує ці через Text(title) з ДИНАМІЧНОЮ
-    // змінною (не літералом), тож самé Text не локалізувало б title автоматично.
+    // String(localized:): SidebarView показує ці через Text(title) з динамічною
+    // змінною, не літералом, тож саме Text не локалізувало б title автоматично.
     static let quickPlaces: [(title: String, path: String)] = [
         (String(localized: "Камера"), "/sdcard/DCIM"),
         (String(localized: "Завантаження"), "/sdcard/Download"),
@@ -143,29 +136,28 @@ final class BrowserStore {
         refilterTask?.cancel()
     }
 
-    // MARK: - Похідний стан (v0.10.1: закешовано в `index`, БЕЗ перерахунку на кожен доступ)
+    // MARK: - Похідний стан (закешовано в `index`, без перерахунку на кожен доступ)
 
-    // v0.10.1 (п.1-3/12-16): sortedEntries/filteredEntries БУЛИ computed без кешу — повне
-    // сортування+фільтр на кожен доступ. Тепер — незмінний BrowserIndex (AndroidMoverCore/
-    // BrowserIndex.swift), побудований РАЗ у scheduleIndexRebuild(), читаний як O(1)/O(|selection|).
+    // sortedEntries/filteredEntries спираються на незмінний BrowserIndex
+    // (AndroidMoverCore/BrowserIndex.swift), побудований раз у scheduleIndexRebuild() і
+    // читаний як O(1)/O(|selection|) — уникає повного сортування й фільтра на кожен доступ.
     private(set) var index: BrowserIndex = .empty
 
-    /// Дорога частина (повне пересортування) — планується лише коли `entries`/`sortOrder`
-    /// РЕАЛЬНО змінились, не на кожен доступ до похідних властивостей. Виконується ПОЗА
-    /// MainActor (`Task.detached`); `indexGeneration`-guard відкидає результат, якщо новіший
-    /// rebuild уже стартував.
+    /// Дорога частина (повне пересортування) планується лише коли `entries`/`sortOrder`
+    /// реально змінились, не на кожен доступ до похідних властивостей. Виконується поза
+    /// MainActor (`Task.detached`); `indexGeneration`-guard відкидає результат, якщо
+    /// новіший rebuild уже стартував.
     ///
-    /// Аудит-фікс (критично): filterText/showHidden БІЛЬШЕ НЕ капчуряться тут на момент
-    /// планування — раніше build() ішов у Task.detached зі знімком `filter`/`hidden`,
-    /// зробленим ЗАРАЗ, а `filterText`/`showHidden`'s didSet (нижче) тим часом синхронно
-    /// оновлюють `index` НАПРЯМУ (`index.refiltered(...)`), без жодного зв'язку з
-    /// `indexGeneration`. Якщо користувач набирав у пошуку, поки ця async-побудова ще
-    /// летіла, її приземлення (MainActor.run) тихо ЗАТИРАЛО свіжий результат пошуку
-    /// застарілим filterText/showHidden — generation-guard рятує лише від застарілих
-    /// entries/sortOrder, не від showHidden/filterText. Тепер офф-main будуємо БЕЗ фільтра
-    /// (сортування — єдина дорога частина), а на MainActor, у момент приземлення, ЖИВІ
-    /// (поточні) `self.filterText`/`self.showHidden` застосовуються через дешевий
-    /// `refiltered(...)` — що б користувач не набрав, доки будувався сорт, саме це й піде у
+    /// filterText/showHidden не захоплюються на момент планування: build() будує
+    /// офф-main без фільтра (сортування — єдина дорога частина), а
+    /// `self.filterText`/`self.showHidden` застосовуються через дешевий
+    /// `refiltered(...)` на MainActor у момент приземлення. Якщо capture'нути фільтр
+    /// заздалегідь, а didSet тим часом синхронно оновлює `index` напряму через
+    /// `index.refiltered(...)` без зв'язку з `indexGeneration`, приземлення
+    /// async-побудови тихо затирає свіжий результат пошуку застарілим значенням —
+    /// generation-guard рятує лише від застарілих entries/sortOrder, не від
+    /// showHidden/filterText. Застосування живих значень на приземленні усуває це
+    /// вікно: що б користувач не набрав, доки тривало сортування, саме це піде у
     /// фінальний index.
     private func scheduleIndexRebuild() {
         indexGeneration += 1
@@ -180,11 +172,12 @@ final class BrowserStore {
         isIndexBuilding = true
         let snapshot = entries
         let spec = currentSortSpec()
-        // v0.12.1: важка побудова — у Task.detached ЛИШЕ над Sendable-значеннями (snapshot, spec),
-        // а `self` читається вже в MainActor-задачі після await. Попередній варіант (weak self
-        // усередині detached + MainActor.run) Swift 6.1 (CI, macos-15) відкидав як «sending
-        // 'self' risks causing data races»; Swift 6.3 приймав. Поведінка та сама: сорт поза main,
-        // приземлення на main із ЖИВИМИ filterText/showHidden і generation-guard.
+        // Важка побудова йде в Task.detached лише над Sendable-значеннями (snapshot,
+        // spec), а `self` читається в MainActor-задачі після await: варіант з weak self
+        // усередині detached і MainActor.run компілятор Swift 6.1 (CI, macos-15)
+        // відкидає як «sending 'self' risks causing data races», хоч Swift 6.3 його
+        // приймає. Поведінка та сама: сорт поза main, приземлення на main із живими
+        // filterText/showHidden і generation-guard.
         Task { [weak self] in
             let built = await Task.detached(priority: .userInitiated) {
                 BrowserIndex.build(entries: snapshot, sortSpec: spec, filterText: "", showHidden: true)
@@ -196,16 +189,16 @@ final class BrowserStore {
         }
     }
 
-    /// Аудит-фікс (medium): дешевий шлях (filterText/showHidden) — БЕЗ пересорту, лише
-    /// повторна фільтрація вже відсортованого `index`, тому не потребує повного
-    /// `Task.detached` з нуля щоразу, ЛИШЕ офф-main ICU-прохід (`RemoteEntry.matches` →
+    /// Дешевий шлях (filterText/showHidden) — без пересорту, лише повторна фільтрація
+    /// вже відсортованого `index`, тому не потребує повного `Task.detached` з нуля
+    /// щоразу, лише офф-main ICU-прохід (`RemoteEntry.matches` →
     /// `localizedCaseInsensitiveContains`, свідомо ICU-коректний заради кирилиці — див.
-    /// BrowserIndex.swift). Guard на приземленні перевіряє ОБИДВІ генерації:
-    /// `filterGeneration` (відкидає застарілий keystroke, якщо новіший уже стартував) і
-    /// `indexGeneration`+`isIndexBuilding` (відкидає результат, порахований проти ЗАСТАРІЛОГО
-    /// `index` — знімок тут узятий ДО того, як паралельний scheduleIndexRebuild() приземлив
-    /// новіший; той рано чи пізно сам застосує ЖИВИЙ filterText/showHidden, тож застосовувати
-    /// тут — саме затирання, від якого вже рятує finding №1).
+    /// BrowserIndex.swift). Guard на приземленні перевіряє обидві генерації:
+    /// `filterGeneration` відкидає застарілий keystroke, якщо новіший уже стартував, а
+    /// `indexGeneration`+`isIndexBuilding` відкидає результат, порахований проти
+    /// застарілого `index` — знімок тут узятий до того, як паралельний
+    /// scheduleIndexRebuild() приземлив новіший; той сам застосує живий
+    /// filterText/showHidden, тож застосовувати тут означало б затерти його.
     private func scheduleRefilter() {
         filterGeneration += 1
         let generation = filterGeneration
@@ -214,9 +207,10 @@ final class BrowserStore {
         let filter = filterText
         let hidden = showHidden
         refilterTask?.cancel()
-        // v0.12.1: той самий переносимий шаблон, що в scheduleIndexRebuild (Swift 6.1 на CI).
-        // Скасування зовнішньої задачі перевіряється до старту і після приземлення; сам
-        // ICU-прохід у detached-задачі не переривається (для одного keystroke це дешево).
+        // Той самий переносимий шаблон, що в scheduleIndexRebuild (сумісний зі Swift
+        // 6.1 на CI). Скасування зовнішньої задачі перевіряється до старту і після
+        // приземлення; сам ICU-прохід у detached-задачі не переривається — для одного
+        // keystroke це дешево.
         refilterTask = Task { [weak self] in
             guard !Task.isCancelled else { return }
             let refiltered = await Task.detached(priority: .userInitiated) {
@@ -244,13 +238,13 @@ final class BrowserStore {
         }
     }
 
-    /// 3.5: приховані файли ("." на початку імені) — лише якщо `showHidden == false`;
-    /// `.androidmover-tmp-*` ховається ЗАВЖДИ. Фільтр по імені (A1) поверх результату.
-    /// O(1) — тонка forward-сумісність до `index.visibleEntries`, щоб BrowserView.swift/
-    /// FileActions.swift не чіпати.
+    /// Приховані файли («.» на початку імені) — лише якщо `showHidden == false`;
+    /// `.androidmover-tmp-*` ховається завжди. Фільтр по імені — поверх результату. O(1) —
+    /// тонка обгортка над `index.visibleEntries`, щоб BrowserView.swift/FileActions.swift
+    /// не чіпати.
     var filteredEntries: [RemoteEntry] { index.visibleEntries }
 
-    /// Аудит-фікс (п.4): перетин `selection` із видимими id — незалежний другий бар'єр від
+    /// Перетин `selection` із видимими id — незалежний другий бар'єр від
     /// `trimSelectionToVisible()`. O(|selection|) — `index.visibleIDs` уже готовий Set.
     var visibleSelection: Set<String> {
         selection.intersection(index.visibleIDs)
@@ -264,7 +258,7 @@ final class BrowserStore {
             // оновить selectionSummary.
             selection = selection.intersection(index.visibleIDs)
         } else {
-            // `index` міг змінитись (нове сортування/рефільтр) БЕЗ зміни самого selection
+            // `index` міг змінитись (нове сортування/рефільтр) без зміни самого selection
             // (той самий набір id усе ще видимий) — а RemoteEntry-дані за цими id (розмір,
             // дата) теоретично могли оновитись (напр. після refreshList). selection's didSet
             // тут не спрацює (набір id той самий), тож освіжаємо явно.
@@ -272,26 +266,26 @@ final class BrowserStore {
         }
     }
 
-    /// Аудит-фікс (п.4): приховане тумблером/фільтром ніколи не потрапляє у "Вибрано: N" чи в
-    /// entries, які підуть у transfer. Фільтрує `index.visibleEntries` (лише видимі, не всі
-    /// до 50k) — і, на відміну від `Set.compactMap`, зберігає порядок таким, яким його бачить
-    /// користувач у таблиці (той порядок іде в TransferEngine і показується в TransferSheet).
+    /// Приховане тумблером чи фільтром ніколи не потрапляє у «Вибрано: N» чи в entries,
+    /// які підуть у transfer. Фільтрує `index.visibleEntries` (лише видимі, не всі до
+    /// 50k) — і, на відміну від `Set.compactMap`, зберігає порядок таким, яким його
+    /// бачить користувач у таблиці (той порядок іде в TransferEngine і показується в
+    /// TransferSheet).
     var selectedEntries: [RemoteEntry] {
         guard !selection.isEmpty else { return [] }
         return index.visibleEntries.filter { selection.contains($0.id) }
     }
 
-    /// Аудит-фікс (high): БУВ computed property, що робив O(|visibleEntries|)-прохід
-    /// (`selectedEntries`) на КОЖЕН доступ — а `bottomBar` (BrowserView.swift) читає його
-    /// напряму в тілі `mainContent`, куди інлайновані pathBar/table/bottomBar РАЗОМ (одна
-    /// `var body`), тож Observation інструментує залежності на рівні ВСЬОГО body: будь-яка
-    /// незалежна зміна деінде в цьому дереві (previewLoadingName під час Quick Look,
-    /// showDisconnectBanner, isLoading) інвалідовувала body і повторно ганяла цей O(n)
-    /// фільтр, навіть коли ні selection, ні index не змінювались. Тепер — закешоване
-    /// значення, що перераховується РАЗ через `refreshSelectionSummary()`, викликану лише
-    /// коли selection (didSet вище) чи index (кінець trimSelectionToVisible) РЕАЛЬНО
-    /// змінились — той самий патерн, що вже застосований до `pendingMoveCount`
-    /// (TransferCoordinator.swift).
+    /// Закешоване значення — уникає O(|visibleEntries|)-проходу (`selectedEntries`) на
+    /// кожен доступ. `bottomBar` (BrowserView.swift) читає його напряму в тілі
+    /// `mainContent`, куди інлайновані pathBar/table/bottomBar разом (одна `var body`),
+    /// тож Observation інструментує залежності на рівні всього body: будь-яка незалежна
+    /// зміна деінде в цьому дереві (previewLoadingName під час Quick Look,
+    /// showDisconnectBanner, isLoading) інвалідує body і без кешу повторно ганяла б цей
+    /// O(n) фільтр, навіть коли ні selection, ні index не змінювались. Перераховується
+    /// лише через `refreshSelectionSummary()`, викликану коли selection (didSet вище) чи
+    /// index (кінець trimSelectionToVisible) реально змінились — той самий патерн, що в
+    /// `pendingMoveCount` (TransferCoordinator.swift).
     private(set) var selectionSummary: String?
 
     private func refreshSelectionSummary() {

@@ -4,7 +4,7 @@ import XCTest
 
 extension EngineTests {
 
-    // MARK: - 1.2: ідле-таймаут ProcessRunner
+    // MARK: - Ідле-таймаут ProcessRunner
 
     func testIdleTimeoutResetsWhileOutputFlows() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only: MOCK_SLOW_STREAM") }
@@ -13,8 +13,8 @@ extension EngineTests {
         for i in 0..<6 {
             try makeFile(folder.appendingPathComponent("f\(i).bin"), data: Data([0x1]), date: loneDate)
         }
-        // 6 рядків по 0.4 с паузи = 2.4 с загалом (> 1 с ідле-таймауту), але кожна ОКРЕМА
-        // пауза МІЖ рядками (0.4 с) коротша за таймаут — потік не мусить перерватись.
+        // 6 рядків по 0.4 с паузи = 2.4 с загалом (> 1 с ідле-таймауту), але кожна окрема
+        // пауза між рядками (0.4 с) коротша за таймаут — потік не мусить перерватись.
         let client = ADBClient(
             adbPath: Self.mockADBPath,
             extraEnvironment: ["MOCK_PHONE_ROOT": phoneRoot.path, "MOCK_SLOW_STREAM": "400"],
@@ -50,7 +50,7 @@ extension EngineTests {
         XCTAssertLessThanOrEqual(elapsed, 2.5, "ідле-таймаут мав спрацювати швидко (\(elapsed) с)")
     }
 
-    // MARK: - 1.5: sweep сиріт (.androidmover-tmp-*)
+    // MARK: - Sweep сиріт (.androidmover-tmp-*)
 
     func testSweepLocalRemovesOldOrphansOnly() throws {
         let dir = localBase.appendingPathComponent("sweep-local-\(UUID().uuidString)")
@@ -94,7 +94,7 @@ extension EngineTests {
         XCTAssertTrue(freshStillThere)
     }
 
-    // MARK: - 1.6: chaos-mock (обрив з'єднання на конкретному виклику)
+    // MARK: - Chaos-mock (обрив з'єднання на конкретному виклику)
 
     /// Виклики transfer(move:false) для [перший, другий] файли-елементи: #1 recursiveFiles
     /// (підрахунок) першого елемента, #2 recursiveFiles другого. Окремий "чистий" client
@@ -103,8 +103,8 @@ extension EngineTests {
     func testDisconnectDuringCountingIsolatesItem() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only: MOCK_DISCONNECT_ON_CALL") }
         let setupClient = makeClient()
-        // v0.10.2: підрахунок (find) тепер робиться лише для ТЕК — плоскі файли беруть розмір
-        // з лістингу без adb-виклику; тому перший елемент — тека (виклик #1 = її recursiveFiles).
+        // Підрахунок (find) робиться лише для тек — плоскі файли беруть розмір з лістингу без
+        // adb-виклику; тому перший елемент — тека (виклик #1 = її recursiveFiles).
         let first = try await setupClient.listDirectory("\(remoteRoot!)/DCIM", on: serial)
             .first { $0.isDirectory }!
         let second = try await setupClient.listDirectory("\(remoteRoot!)/Download", on: serial)
@@ -130,11 +130,9 @@ extension EngineTests {
         XCTAssertTrue(fm.fileExists(atPath: destination.appendingPathComponent("самотній.bin").path))
     }
 
-    /// v0.11.0: для move додався md5 перед видаленням — виклики transfer(move:true) для
-    /// ОДНОГО файла-елемента: #1 pull, #2 md5sum, #3 rm (обрив на #3).
-    /// (v0.10.2 було: #1 pull, #2 rm.)
-    /// (До v0.10.2 було: #1 recursiveFiles (підрахунок),
-    /// #2 pull (transferOne), #3 rm (delete джерела ПІСЛЯ verify) — саме на ньому обрив.
+    /// Для move md5 йде перед видаленням: виклики transfer(move:true) для одного
+    /// файла-елемента дають #1 pull, #2 md5sum, #3 rm (обрив на #3, delete джерела після
+    /// verify — саме на ньому й імітується обрив зв'язку).
     func testDisconnectDuringDeleteReportsCopiedButNotDeleted() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only: MOCK_DISCONNECT_ON_CALL") }
         let setupClient = makeClient()
@@ -160,15 +158,15 @@ extension EngineTests {
         let copied = destination.appendingPathComponent("самотній.bin")
         XCTAssertTrue(fm.fileExists(atPath: copied.path))
         XCTAssertEqual(try Data(contentsOf: copied), Data("12345".utf8))
-        // Джерело на "телефоні" ЛИШИЛОСЬ (rm провалився через обрив) — дані не загубились.
+        // Джерело на "телефоні" лишилось (rm провалився через обрив) — дані не загубились.
         let sourceStillThere = try await remoteFileExists("Download/самотній.bin")
         XCTAssertTrue(sourceStillThere)
     }
 
-    /// Виклики push() для ОДНОГО локального файла: #1 mkdir(tmpRoot), #2 mkdir(itemTmpDir),
-    /// #3 push, #4 recursiveFiles-верифікація ПІСЛЯ push (обрив саме тут), #5 delete tmpRoot
-    /// (best-effort прибирання — mock знову живий після ОДНОГО обриву, тож проходить).
-    /// v0.11.0 (P2): обрив на verify більше не провал — докачка після повернення пристрою.
+    /// Виклики push() для одного локального файла: #1 mkdir(tmpRoot), #2 mkdir(itemTmpDir),
+    /// #3 push, #4 recursiveFiles-верифікація після push (обрив саме тут), #5 delete tmpRoot
+    /// (best-effort прибирання — mock знову живий після одного обриву, тож проходить). Обрив
+    /// на verify не є провалом — докачка йде після повернення пристрою.
     func testDisconnectDuringPushVerifyResumesAndCleansTmp() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only: MOCK_DISCONNECT_ON_CALL") }
         let localFile = pushSource.appendingPathComponent("обрив-push.bin")
@@ -194,7 +192,7 @@ extension EngineTests {
         XCTAssertEqual(leftovers, [])
     }
 
-    // MARK: - 1.7: fuzz/property-тест парсерів
+    // MARK: - Fuzz/property-тест парсерів
 
     func testFuzzNamesRoundTripThroughListingRenameDelete() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only: пряме створення файлів на диску") }
@@ -220,7 +218,7 @@ extension EngineTests {
 
         // Перейменовуємо перші 10 на нові випадкові (унікальні) імена. ADBClient.rename сам
         // обрізає пробіли з країв нового імені (як і слід — це введення користувача) — тест
-        // звіряє з ТОЮ Ж обрізаною версією, інакше ім'я з випадковим пробілом на краю
+        // звіряє з тою ж обрізаною версією, інакше ім'я з випадковим пробілом на краю
         // (алфавіт fuzz-генератора його свідомо включає) хибно "зникло" б у порівнянні.
         var rng = FuzzNames.LCG(seed: 0xDEAD_BEEF)
         var seen = Set(names)
@@ -255,9 +253,9 @@ extension EngineTests {
         }
     }
 
-    // MARK: - 2.4: adb track-devices (ProcessRunner.stream())
+    // MARK: - adb track-devices (ProcessRunner.stream())
 
-    /// Крутиться, доки `condition()` не стане true чи не спливе `timeout` — БЕЗ жодного throw
+    /// Крутиться, доки `condition()` не стане true чи не спливе `timeout` — без жодного throw
     /// на таймаут (нехай подальші XCTAssert самі чесно провалять тест зі зрозумілим числом,
     /// а не замаскують провал під помилку самого хелпера).
     private func waitUntil(timeout: TimeInterval, _ condition: () -> Bool) async throws {

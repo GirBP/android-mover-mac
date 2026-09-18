@@ -4,7 +4,7 @@ import XCTest
 
 extension EngineTests {
 
-    // MARK: - v0.11.0: протоколи надійності (P1 md5, P3 безпечне видалення тек, P7 самолікування)
+    // MARK: - Протоколи надійності (md5, безпечне видалення тек, самолікування)
 
     func testChecksumMismatchTriggersRepullAndMoveSucceeds() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only") }
@@ -118,10 +118,10 @@ extension EngineTests {
         XCTAssertLessThanOrEqual(pulls, 1 + TransferEngine.verificationAttemptCap, "верифікаційні провали не крутять 15 спроб")
     }
 
-    // MARK: - v0.12.2 (M1): маніфест, за яким видаляють, = маніфест, який верифікували (H4); повний телефон (M3)
+    // MARK: - Маніфест, за яким видаляють, = маніфест, який верифікували; повний телефон
 
     /// H4: після двох верифікаційних провалів список файлів перечитується (P7); файл, що з'явився
-    /// у теці ПІД ЧАС переносу, потрапляє в оновлений список, докачується, верифікується — і тоді
+    /// у теці під час переносу, потрапляє в оновлений список, докачується, верифікується — і тоді
     /// видаляється разом з рештою, бо видалення йде за `VerifiedManifest`, а не за початковим
     /// `expected`. Старий код лишав його на телефоні з попередженням (розбіжність двох списків).
     func testMoveDirectoryDeletesExactlyTheVerifiedSetAfterRefresh() async throws {
@@ -186,7 +186,7 @@ extension EngineTests {
         XCTAssertTrue(TransferEngine.isResumable(ordinary))
     }
 
-    // MARK: - v0.11.0 (P2): докачка push після обриву
+    // MARK: - Докачка push після обриву
 
     func testPushResumesAfterFailureWithoutLoss() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only") }
@@ -232,7 +232,7 @@ extension EngineTests {
         XCTAssertEqual(leftovers, [])
     }
 
-    // MARK: - v0.11.0 (P4): onItemFinished — по одному, в порядку entries, для всіх шляхів
+    // MARK: - onItemFinished — по одному, в порядку entries, для всіх шляхів
 
     func testOnItemFinishedReportsEveryEntryInOrder() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only") }

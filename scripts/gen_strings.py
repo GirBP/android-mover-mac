@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""3.7: парсить Sources/AndroidMover/**/*.swift (лише UI-таргет, AndroidMoverCore не чіпаємо),
-збирає ключі з Text("…") і String(localized: "…") та ДОДАЄ відсутні у
+"""Парсить Sources/AndroidMover/**/*.swift (лише UI-таргет, AndroidMoverCore не чіпаємо),
+збирає ключі з Text("…") і String(localized: "…") та додає відсутні у
 Sources/AndroidMover/Resources/Localizable.xcstrings, зберігаючи наявні значення (лише
 merge — ніколи не видаляє й не перезаписує вже присутній ключ). EN не додає: sourceLanguage
 "uk" — ключ сам є текстом джерела, порожній запис `{}` цілком легальний String Catalog.
 
-Свідомо НЕ намагається розібрати рядки з інтерпольованими значеннями (`\\(...)`) — String
+Свідомо не намагається розібрати рядки з інтерпольованими значеннями (`\\(...)`) — String
 Catalog очікує format-specifier-синтаксис (%lld/%@) для них, а не сирий Swift-код; такі
 виклики просто пропускаються (не додаються в каталог), самé Text()/String(localized:) у коді
 від цього не залежить і продовжує працювати як завжди.

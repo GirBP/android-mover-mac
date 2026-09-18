@@ -78,7 +78,7 @@ extension EngineTests {
             .filter { $0.hasPrefix(".androidmover-tmp") }
         XCTAssertEqual(leftovers, [])
 
-        // Дата САМОЇ ТЕКИ теж відновлена (adb pull -a її не зберігає — рушій робить це сам).
+        // Дата самої теки теж відновлена (adb pull -a її не зберігає — рушій робить це сам).
         XCTAssertEqual(try mtimeEpoch(copied), Int(vacationDirDate.timeIntervalSince1970))
         XCTAssertEqual(try creationEpoch(copied), Int(vacationDirDate.timeIntervalSince1970))
     }
@@ -102,7 +102,7 @@ extension EngineTests {
         XCTAssertEqual(results[0].status, .moved)
         XCTAssertEqual(results[0].finalURL?.lastPathComponent, trickyName)
         XCTAssertEqual(try Data(contentsOf: destination.appendingPathComponent(trickyName)), Data("tricky".utf8))
-        // Видалено САМЕ цей файл, а сусід без пробіла (нема) не постраждав би.
+        // Видалено саме цей файл, а сусід без пробіла (нема) не постраждав би.
         let trickyGone = try await remoteFileExists("Download/\(trickyName)")
         XCTAssertFalse(trickyGone)
         let neighborStillThere = try await remoteFileExists("Download/самотній.bin")
@@ -110,7 +110,7 @@ extension EngineTests {
     }
 
     func testSentinelLookalikeNamesDoNotBreakListing() async throws {
-        // Імена, що МІСТЯТЬ сентинел, не мають вмикати хибні помилки (перевірка першого рядка).
+        // Імена, що містять сентинел, не мають вмикати хибні помилки (перевірка першого рядка).
         try await addRemoteFile("Download/backup__AM_MISSING__old.jpg",
                                  data: Data(repeating: 0x01, count: 6), date: loneDate)
         try await addRemoteFile("Download/x__AM_NOT_A_DIR__y.txt",
@@ -140,7 +140,7 @@ extension EngineTests {
         if Self.backend == "real" { throw XCTSkip("mock-only") }
 
         // /sdcard на реальних телефонах — symlink; find -P без розіменування показував би
-        // «Тека порожня». Лістинг мусить розіменувати корінь і віддати КАНОНІЧНІ шляхи.
+        // «Тека порожня». Лістинг мусить розіменувати корінь і віддати канонічні шляхи.
         let realDir = phoneRoot.appendingPathComponent("справжня тека")
         try fm.createDirectory(at: realDir, withIntermediateDirectories: true)
         try makeFile(realDir.appendingPathComponent("файл всередині.txt"),
@@ -215,7 +215,7 @@ extension EngineTests {
     func testCorruptedPullDoesNotDeleteSource() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only") }
         // MOCK_CORRUPT_PULL=1 (безлімітний варіант, на відміну від MOCK_CORRUPT_PULL_COUNT)
-        // ламає геть КОЖЕН pull, тож і докачка (B2) отримає биту копію знову — семантика
+        // ламає геть кожен pull, тож і докачка (B2) отримає биту копію знову — семантика
         // «джерело не видалене» мусить лишитись, попри те, що тепер є цикл спроб. maxAttempts:1
         // тримає тест швидким (без цього — дефолтні 5 спроб із зростаючою паузою).
         let client = makeClient(extraEnv: ["MOCK_CORRUPT_PULL": "1"])
@@ -234,7 +234,7 @@ extension EngineTests {
         XCTAssertTrue(message.contains("не збігається") || message.contains("Перевірка копії"),
                       "повідомлення: \(message)")
 
-        // Джерело ПОВНІСТЮ на місці.
+        // Джерело повністю на місці.
         XCTAssertTrue(fm.fileExists(atPath: phoneRoot.appendingPathComponent("DCIM/Фото відпустки/IMG_0001.jpg").path))
         XCTAssertTrue(fm.fileExists(atPath: phoneRoot.appendingPathComponent("DCIM/Фото відпустки/відео кліп.mp4").path))
         // Нічого не потрапило в призначення.

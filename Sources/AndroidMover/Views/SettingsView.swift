@@ -1,12 +1,12 @@
 import SwiftUI
 import AndroidMoverCore
 
-/// Settings-сцена (⌘,) — фундамент для майбутніх налаштувань. Поки що лише історія операцій (A5).
+/// Settings-сцена (⌘,).
 struct SettingsView: View {
     @AppStorage("history.enabled") private var historyEnabled = true
-    /// v0.11.0 (P1): коли звіряти md5 копії з телефоном (TransferCoordinator.checksumPolicy).
+    /// Коли звіряти md5 копії з телефоном (TransferCoordinator.checksumPolicy).
     @AppStorage("transfer.checksumPolicy") private var checksumPolicy = ChecksumPolicy.beforeDelete.rawValue
-    /// 4.1: мініатюри фото з перших 64 КБ файла на телефоні (ThumbnailCache+Remote).
+    /// Мініатюри фото з перших 64 КБ файла на телефоні (ThumbnailCache+Remote).
     @AppStorage(ThumbnailCache.remoteThumbnailsDefaultsKey) private var remoteThumbnails = true
     @State private var confirmingClear = false
 

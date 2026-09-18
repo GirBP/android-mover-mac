@@ -3,7 +3,7 @@ import ImageIO
 import CoreGraphics
 @testable import AndroidMoverCore
 
-/// 4.1: вбудовані мініатюри з перших 64 КБ файла + ADBClient.readHead через mock (`exec-out head`).
+/// Вбудовані мініатюри з перших 64 КБ файла + ADBClient.readHead через mock (`exec-out head`).
 final class EmbeddedThumbnailTests: XCTestCase {
     private static let mockADBPath = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

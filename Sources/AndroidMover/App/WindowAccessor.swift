@@ -1,13 +1,13 @@
 import SwiftUI
 import AppKit
 
-/// Аудит-фікс (п.5б): закриття ОДНОГО вікна (червона кнопка, ⌘W) — SwiftUI сам не дає гачка
-/// "чи можна закрити це вікно" (на відміну від `applicationShouldTerminate` для виходу з
-/// усього додатка, AppDelegate.swift). Місток: NSViewRepresentable, що знаходить NSWindow
-/// цього SwiftUI-вікна (через `viewDidMoveToWindow`, надійніше за голий `DispatchQueue.main.
-/// async` — спрацьовує рівно в момент, коли вікно РЕАЛЬНО стало доступне) і ставить
+/// Закриття одного вікна (червона кнопка, ⌘W) — SwiftUI сам не дає гачка "чи можна закрити
+/// це вікно" (на відміну від `applicationShouldTerminate` для виходу з усього додатка,
+/// AppDelegate.swift). Місток: NSViewRepresentable, що знаходить NSWindow цього
+/// SwiftUI-вікна (через `viewDidMoveToWindow`, надійніше за голий `DispatchQueue.main.
+/// async` — спрацьовує рівно в момент, коли вікно реально стало доступне) і ставить
 /// `CloseGuardWindowDelegate` нижче — той самий alert, що й підтвердження виходу, але лише
-/// для черги ЦЬОГО вікна.
+/// для черги цього вікна.
 struct WindowAccessor: NSViewRepresentable {
     let coordinator: TransferCoordinator
 
@@ -16,7 +16,7 @@ struct WindowAccessor: NSViewRepresentable {
         view.onWindow = { [coordinator] window in
             guard context.coordinator.retainedDelegate == nil else { return }
             let guardDelegate = CloseGuardWindowDelegate(coordinator: coordinator, previous: window.delegate)
-            // NSWindow.delegate — weak: без сильного посилання ТУТ (Coordinator, що живе,
+            // NSWindow.delegate — weak: без сильного посилання тут (Coordinator, що живе,
             // доки живий цей SwiftUI-view) ARC звільнив би guardDelegate одразу.
             context.coordinator.retainedDelegate = guardDelegate
             window.delegate = guardDelegate
@@ -44,10 +44,10 @@ struct WindowAccessor: NSViewRepresentable {
     }
 }
 
-/// Перехоплює `windowShouldClose` для ОДНОГО вікна — усі інші виклики NSWindowDelegate
+/// Перехоплює `windowShouldClose` для одного вікна — усі інші виклики NSWindowDelegate
 /// пересилає далі (`forwardingTarget(for:)`) до попереднього делегата (SwiftUI-власного), щоб
 /// не зламати те, на що сам SwiftUI покладається (стан вікна, life-cycle сцени тощо). Якщо
-/// попередній делегат САМ мав би заборонити закриття — поважаємо це першим, ДО власної
+/// попередній делегат сам мав би заборонити закриття — поважаємо це першим, до власної
 /// перевірки черги.
 private final class CloseGuardWindowDelegate: NSObject, NSWindowDelegate {
     let coordinator: TransferCoordinator
@@ -68,7 +68,7 @@ private final class CloseGuardWindowDelegate: NSObject, NSWindowDelegate {
         let alert = NSAlert()
         alert.messageText = String(localized: "Операція триває — скасувати і закрити?")
         alert.informativeText = String(localized: "У цьому вікні є незавершене перенесення чи push. Закриття скасує їх.")
-        // v0.10.2: Enter/default — безпечна дія («Продовжити роботу»), деструктивна — друга.
+        // Enter/default — безпечна дія («Продовжити роботу»), деструктивна — друга.
         alert.addButton(withTitle: String(localized: "Продовжити роботу"))
         let closeButton = alert.addButton(withTitle: String(localized: "Скасувати і закрити"))
         closeButton.hasDestructiveAction = true

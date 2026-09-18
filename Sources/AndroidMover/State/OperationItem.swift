@@ -1,7 +1,7 @@
 import Foundation
 import AndroidMoverCore
 
-/// 3.3: три стани рядка в `OperationQueuePanel` — `OperationItem.rowState` рахує його з
+/// Три стани рядка в `OperationQueuePanel` — `OperationItem.rowState` рахує його з
 /// `started`+`results` конкретної сесії (жодна з них сама по собі цього не розрізняє:
 /// `isRunning == (results == nil)` каже правду і для "ще не стартувала", і для "виконується").
 enum QueueRowState {
@@ -10,9 +10,9 @@ enum QueueRowState {
     case finished
 }
 
-/// 3.3: обгортка над TransferSession/PushSession, що дозволяє тримати обидва типи в одному
+/// Обгортка над TransferSession/PushSession, що дозволяє тримати обидва типи в одному
 /// масиві (`TransferCoordinator.queue`) — enum, не `protocol OperationSessionProtocol`
-/// з existential-типами: "Деталі…" (OperationQueuePanel → BrowserView) відкриває КОНКРЕТНО
+/// з existential-типами: "Деталі…" (OperationQueuePanel → BrowserView) відкриває конкретно
 /// типізований TransferSheet/PushSheet, а existential довелось би `as?`-кастити назад до
 /// конкретного типу в тому самому місці — enum дає це безкоштовно через exhaustive switch.
 /// `@MainActor`: TransferSession/PushSession самі MainActor-ізольовані (той самий клас, що й
@@ -88,9 +88,9 @@ enum OperationItem: Identifiable {
         }
     }
 
-    /// Аудит-фікс (п.1): модель/serial пристрою, ЗАФІКСОВАНОГО для цього елемента при
-    /// постановці в чергу (не поточного активного) — рядок панелі й "Деталі…" показують, ПРО
-    /// ЯКИЙ САМЕ пристрій цей елемент, попри те, що активний пристрій міг відтоді змінитись.
+    /// Модель/serial пристрою, зафіксованого для цього елемента при постановці в чергу (не
+    /// поточного активного) — рядок панелі й "Деталі…" показують, про який саме пристрій цей
+    /// елемент, попри те, що активний пристрій міг відтоді змінитись.
     var targetDeviceLabel: String {
         switch self {
         case .transfer(let session): return session.targetDeviceLabel
@@ -136,7 +136,7 @@ enum OperationItem: Identifiable {
         }
     }
 
-    /// v0.10.4: «45,2 MB/s · ~3 хв» під час копіювання, nil в інших фазах.
+    /// «45,2 MB/s · ~3 хв» під час копіювання, nil в інших фазах.
     var throughputLabel: String? {
         switch self {
         case .transfer(let session): return session.throughputLabel
@@ -197,7 +197,7 @@ enum OperationItem: Identifiable {
     /// елемента.
     var showInFinderURL: URL? { showInFinderURLs.first }
 
-    /// v0.10.2: усі фінальні URL пакету — «Показати у Finder» виділяє їх разом.
+    /// Усі фінальні URL пакету — «Показати у Finder» виділяє їх разом.
     var showInFinderURLs: [URL] {
         switch self {
         case .transfer(let session): return session.results?.compactMap(\.finalURL) ?? []

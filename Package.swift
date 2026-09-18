@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "AndroidMover",
-    // 3.7: String Catalog (Sources/AndroidMover/Resources/Localizable.xcstrings) — джерело
+    // String Catalog (Sources/AndroidMover/Resources/Localizable.xcstrings) — джерело
     // "uk", жодних EN-перекладів поки нема (лише інфраструктура).
     defaultLocalization: "uk",
     platforms: [.macOS(.v14)],

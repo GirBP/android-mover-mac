@@ -1,6 +1,6 @@
 import Foundation
 
-/// v0.13.0 (M2): один записаний виклик adb — argv, сирі байти stdout/stderr, код виходу.
+/// Один записаний виклик adb — argv, сирі байти stdout/stderr, код виходу.
 /// Формат на диску — JSON Lines (один запис на рядок; `Data` кодується base64). Це майбутні
 /// golden-транскрипти з реального телефона.
 public struct TranscriptRecord: Codable, Sendable, Equatable {
@@ -87,7 +87,7 @@ public final class RecordingTransport: ADBTransport, @unchecked Sendable {
     }
 }
 
-/// Відтворює записаний транскрипт без підпроцесу: збіг за ТОЧНИМ argv, записи з однаковим argv
+/// Відтворює записаний транскрипт без підпроцесу: збіг за точним argv, записи з однаковим argv
 /// віддаються по черзі появи. На виклик, якого в транскрипті нема, кидає `Miss` — тихого
 /// порожнього виводу не буває, інакше тест доводив би не те, що думає.
 public final class TranscriptTransport: ADBTransport, @unchecked Sendable {

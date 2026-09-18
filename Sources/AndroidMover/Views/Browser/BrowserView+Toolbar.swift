@@ -1,10 +1,10 @@
 import SwiftUI
 
-/// 3.1: тулбар BrowserView — «Оновити», «Історія», «Нова тека», перемикач прихованих файлів
-/// (3.5). Кнопка згортання sidebar — системна, NavigationSplitView додає її сама.
-/// Винесено в окремий файл (не in-line в body), щоб BrowserView.swift лишався ≤400 рядків —
-/// той самий тип, просто інший файл (як 2.8 розбило ADBClient/TransferEngine по файлах).
-/// 3.6: кожна кнопка тут icon-only — `.accessibilityLabel` дублює `.help`, бо VoiceOver
+/// Тулбар BrowserView — «Оновити», «Історія», «Нова тека», перемикач прихованих файлів.
+/// Кнопка згортання sidebar — системна, NavigationSplitView додає її сама.
+/// Винесено в окремий файл (не in-line в body), щоб BrowserView.swift не переростав
+/// розумну довжину файлу — той самий тип, просто інший файл.
+/// Кожна кнопка тут icon-only — `.accessibilityLabel` дублює `.help`, бо VoiceOver
 /// покладатись на tooltip-текст не може.
 extension BrowserView {
     @ToolbarContentBuilder

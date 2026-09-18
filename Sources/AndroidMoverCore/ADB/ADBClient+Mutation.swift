@@ -1,7 +1,7 @@
 import Foundation
 
 /// Мутуючі операції на телефоні: delete/deleteMany/rmdir/mkdir/rename/move. Кожна — під guard-ом
-/// `RemotePath` ДО будь-якого виклику. v0.15.0 (M3): скрипти зі словника `ADBScripts`.
+/// `RemotePath` до будь-якого виклику. Скрипти зі словника `ADBScripts`.
 extension ADBClient {
     // MARK: - Видалення
 
@@ -35,7 +35,7 @@ extension ADBClient {
         return Self.markedPaths(in: result.out, marker: ADBSentinel.deleteFailed.rawValue + "|")
     }
 
-    /// v0.11.0 (P3): прибирає ЛИШЕ порожні теки (`rmdir`), знизу вгору за глибиною. Тека, де
+    /// Прибирає лише порожні теки (`rmdir`), знизу вгору за глибиною. Тека, де
     /// з'явились чужі файли, лишається — повертається у результаті, щоб користувач знав.
     public func removeEmptyDirectories(_ paths: [String], on serial: String) async throws -> Set<String> {
         let normalized = paths.map(RemotePath.normalized)
@@ -67,7 +67,7 @@ extension ADBClient {
 
     // MARK: - Створення теки та перейменування
 
-    /// v0.11.0 (P2): `mkdir -p` — вкладені теки для докачки push (батьки могли не приземлитись).
+    /// `mkdir -p` — вкладені теки для докачки push (батьки могли не приземлитись).
     public func makeDirectories(_ path: String, on serial: String) async throws {
         let p = RemotePath.normalized(path)
         guard RemotePath.isAllowedPushTarget(p) else { throw ADBError.unsafePushTarget(p) }
@@ -90,7 +90,7 @@ extension ADBClient {
     }
 
     /// Спільний скрипт `mv`, яким користуються і rename (у межах тієї самої теки), і move
-    /// (довільний абсолютний target, B1 push): зайнята ціль → __AM_EXISTS__, невдалий mv →
+    /// (довільний абсолютний target push): зайнята ціль → __AM_EXISTS__, невдалий mv →
     /// __AM_MV_FAILED__. Guard-и безпеки — відповідальність викликача (різні для rename і move).
     private func moveRaw(from path: String, to target: String, on serial: String) async throws {
         let p = RemotePath.normalized(path)
@@ -123,7 +123,7 @@ extension ADBClient {
         return target
     }
 
-    /// Переміщує елемент у довільний абсолютний шлях (B1 push: з тимчасової теки у видиме
+    /// Переміщує елемент у довільний абсолютний шлях (push: з тимчасової теки у видиме
     /// місце). Джерело захищене isUnsafeToDelete (як delete/rename), ціль — isAllowedPushTarget.
     public func move(_ path: String, to targetPath: String, on serial: String) async throws {
         let p = RemotePath.normalized(path)

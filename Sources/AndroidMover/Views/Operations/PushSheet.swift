@@ -1,9 +1,9 @@
 import SwiftUI
 import AndroidMoverCore
 
-/// 2.3: тонка обгортка над OperationSheet, дзеркало TransferSheet — без «Показати у
-/// Finder» (результат push лишається на телефоні, не на Mac).
-/// 3.3: більше НЕ модальний sheet — див. коментар у TransferSheet.swift.
+/// Тонка обгортка над OperationSheet, дзеркало TransferSheet — без «Показати у
+/// Finder» (результат push лишається на телефоні, не на Mac). Не модальний sheet — див.
+/// коментар у TransferSheet.swift.
 struct PushSheet: View {
     let session: PushSession
     @Environment(\.dismiss) private var dismiss

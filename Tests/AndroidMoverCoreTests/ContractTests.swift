@@ -2,8 +2,8 @@ import Foundation
 import XCTest
 @testable import AndroidMoverCore
 
-/// v0.15.0 (M3): словник скриптів ↔ контракт ↔ mock. Дрейф між Swift і mock тепер — червоний тест,
-/// а не мовчазна розбіжність.
+/// Словник скриптів ↔ контракт ↔ mock. Дрейф між Swift і mock — червоний тест, а не мовчазна
+/// розбіжність.
 final class ContractTests: XCTestCase {
     static var packageRoot: URL {
         URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -17,8 +17,7 @@ final class ContractTests: XCTestCase {
         }
     }
 
-    /// Тіла скриптів — дослівно ті, що ADBClient відправляв до v0.15.0 (переїзд у словник
-    /// механічний). Кілька ключових перевіряються проти літералів, скопійованих з коду v0.14.0.
+    /// Кілька ключових скриптів перевіряються проти фіксованих очікуваних літералів.
     func testScriptBodiesMatchPreMigrationLiterals() {
         let p = "/sdcard/DCIM/o'clock файл.txt"
         let q = RemotePath.shellQuote(p)

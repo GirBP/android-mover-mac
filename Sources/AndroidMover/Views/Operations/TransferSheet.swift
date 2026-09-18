@@ -1,12 +1,10 @@
 import SwiftUI
 import AndroidMoverCore
 
-/// 2.3: тонка обгортка над OperationSheet — конфігурація специфічна для перенесення
-/// Android → Mac: заголовки, кнопка «Показати у Finder».
-/// 3.3: більше НЕ модальний sheet — «Деталі…» на завершеному рядку OperationQueuePanel.
-/// Сесія тут завжди вже `!isRunning` (результат є), тому `state` більше не потрібен —
-/// «Закрити» просто закриває sheet (`@Environment(\.dismiss)`, як HistoryView), а не викликає
-/// `closeTransfer()` (той метод пішов разом з одиночним `transfers.transfer`).
+/// Тонка обгортка над OperationSheet — конфігурація специфічна для перенесення
+/// Android → Mac: заголовки, кнопка «Показати у Finder». Не модальний sheet — «Деталі…» на
+/// завершеному рядку OperationQueuePanel. Сесія тут завжди вже `!isRunning` (результат є),
+/// тому «Закрити» просто закриває sheet (`@Environment(\.dismiss)`, як HistoryView).
 struct TransferSheet: View {
     let session: TransferSession
     @Environment(\.dismiss) private var dismiss

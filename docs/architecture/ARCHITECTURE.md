@@ -1,7 +1,7 @@
 # ARCHITECTURE
 
 Android Mover — SwiftUI + SPM (macOS 14+), два таргети: `AndroidMoverCore` (без UI,
-Swift 6 strict, юніт-тестований) і `AndroidMover` (SwiftUI, з 2.5 теж Swift 6 strict).
+Swift 6 strict, юніт-тестований) і `AndroidMover` (SwiftUI, теж Swift 6 strict).
 Жодна зовнішня залежність — увесь транспорт іде через системний `adb`.
 
 ## Шари
@@ -20,24 +20,24 @@ SwiftUI View (BrowserView, OperationSheet, OnboardingView, …)
 ```
 
 **ProcessRunner/ChildProcess** — `posix_spawn`-обгортка над adb-процесом: байт-у-байт
-argv/env (НЕ `Foundation.Process` — той NFD-декомпозує українські імена), idle-timeout
+argv/env (не `Foundation.Process` — той NFD-декомпозує українські імена), idle-timeout
 (годинник скидається на кожен chunk виводу), `stream()` для довгоживучих команд
-(`track-devices`; фінішує лише коли ОБИДВА пайпи — stdout і stderr — віддали EOF, інакше
-пізній текст stderr губився), cancel через SIGTERM→3с→SIGKILL. `ChildProcess.swift`
+(`track-devices`; фінішує лише коли обидва пайпи — stdout і stderr — віддали EOF, інакше
+пізній текст stderr губиться), cancel через SIGTERM→3с→SIGKILL. `ChildProcess.swift`
 (процес-дескриптор), `ProcessRunner.swift` (spawnChild/run), `ProcessRunner+Stream.swift`
 (stream()) — той самий тип/поведінка, розбиті по файлах.
 
-`ChildProcess.terminateWithEscalation()` — ЄДИНЕ джерело правди для ескалації
+`ChildProcess.terminateWithEscalation()` — єдине джерело правди для ескалації
 SIGTERM→3с→SIGKILL, idempotent (`escalationIssued` під lock, per-процес): другий і
 подальші виклики — no-op, попри те, з якого з чотирьох незалежних джерел скасування
 прийшов виклик (`CancellationController.cancel()`, гонка spawn-після-cancel у
 `trackProcess`, idle-таймаут `ProcessRunner.run`, `onTermination` у
-`ProcessRunner.stream`). Раніше кожне з цих чотирьох місць дублювало `terminate() +
-DispatchQueue.asyncAfter(3с) { forceKill() }` окремо, кожне зі своїм прапорцем
-одноразовості — тепер лише `child.terminateWithEscalation()`.
+`ProcessRunner.stream`). Дублювання `terminate() + DispatchQueue.asyncAfter(3с) {
+forceKill() }` окремо в кожному місці, кожне зі своїм прапорцем одноразовості, замінене
+одним спільним `child.terminateWithEscalation()`.
 
 **ADBClient** — один клас-фасад над усіма adb-командами. Кожна shell-операція друкує
-сентинел `__AM_*` як ПЕРШИЙ РЯДОК виводу (`ADBClient.firstLine`) — успіх/провал
+сентинел `__AM_*` як перший рядок виводу (`ADBClient.firstLine`) — успіх/провал
 розрізняється по ньому, а не по exit-коду (adb сам завжди повертає 0, доки не впав
 процес). Шляхи йдуть через `RemotePath` (`shellQuote`, `normalized`, `isUnsafeToDelete`,
 `isAllowedPushTarget`) — порівняння/квотинг лише на `unicodeScalars`, бо
@@ -46,9 +46,10 @@ DispatchQueue.asyncAfter(3с) { forceKill() }` окремо, кожне зі с�
 discover/run/devices), `ADBClient+TrackDevices.swift` (`trackDevices()` + `parseTrack-
 DevicesFrames` — невалідний hex-префікс резинхронізується побайтово, а не зупиняє розбір
 назавжди; запобіжник на >64 КБ буфера без жодного розібраного кадру + `waitForDevice`),
-`ADBClient+Listing.swift` (лістинг/рекурсивний перелік/pull), `ADBClient+FileOps.swift`
-(delete/mkdir/move/rename/push/remoteExists/statMTimes/storageInfo/rescan) — той самий
-тип, той самий контракт `__AM_*`, розбиті по файлах.
+`ADBClient+Listing.swift` (лістинг/рекурсивний перелік/pull), `ADBClient+Mutation.swift`
+(delete/mkdir/move/rename), `ADBClient+Meta.swift` (remoteExists/statMTimes/storageInfo/
+rescan), `ADBClient+Bytes.swift` (readHead/checksums/pullMany/push) — той самий тип, той
+самий контракт `__AM_*`, розбиті по файлах.
 
 **TransferEngine / PushEngine** — рушії high-level операцій (рахує → тягне/штовхає →
 верифікує → (move) видаляє). Обидва успадковують скасування від
@@ -61,8 +62,8 @@ cancel (якщо `cancel()` викликали до `trackProcess`, щойно �
 `finishAfterPull`/`sleepCancellably`), `TransferEngine+Verify.swift` (верифікація/дати/
 колізії/статичні допоміжні) — той самий тип, розбитий по файлах.
 
-**5 сховищ** (`Sources/AndroidMover/State/`, кожне `@MainActor @Observable`, 2.1) —
-композиція, не спадкування; кожне тримає СИЛЬНЕ однонапрямне посилання лише на те, що
+**5 сховищ** (`Sources/AndroidMover/State/`, кожне `@MainActor @Observable`) —
+композиція, не спадкування; кожне тримає сильне однонапрямне посилання лише на те, що
 йому реально треба (граф без циклів):
 
 ```
@@ -75,13 +76,13 @@ DeviceStore  ←  BrowserStore  ←  TransferCoordinator
 - `DeviceStore` — adb-шлях, встановлення, `stage`, список пристроїв через
   `ADBClient.trackDevices()` (один довгоживучий Task, а не поллінг `adb devices`
   кожні 2.5 с; модель пристрою кадру track-devices завжди nil — довантажується раз на
-  serial через `devices()`, чекається ІНЛАЙН перед публікацією кадру, щоб displayName не
-  "блимав" serial→модель, і кешується). Довгоживучий `trackTask` захоплює `self` СЛАБО і
-  зв'язує в сильний локальний лише на момент застосування ОДНОГО кадру (`guard let self`
+  serial через `devices()`, чекається інлайн перед публікацією кадру, щоб displayName не
+  "блимав" serial→модель, і кешується). Довгоживучий `trackTask` захоплює `self` слабо і
+  зв'язує в сильний локальний лише на момент застосування одного кадру (`guard let self`
   усередині `for try await frame in ...`), а не на весь час стріму — інакше `self`
   лишався б живим, доки стрім жує кадри (практично вічно), і `deinit` ніколи не
   спрацьовував би. Кадри, що приходять, доки `isOperationActive()` (== `transfers.transfer
-  != nil`, задає AppState) каже true, НЕ публікуються одразу — кладуться в `pendingFrame`
+  != nil`, задає AppState) каже true, не публікуються одразу — кладуться в `pendingFrame`
   (stage не мав переключатись на `.noDevice` посеред pull/resume, TransferSheet лишається
   відкритим, докачка сама чекає повернення пристрою всередині TransferEngine); `flushPendingFrame()`
   публікує найсвіжіший накопичений кадр, коли `TransferCoordinator.onOperationEnded`
@@ -91,7 +92,7 @@ DeviceStore  ←  BrowserStore  ←  TransferCoordinator
   «чи змінився каталог», реагує на зміну пристрою через
   `deviceWasExplicitlySelected()`/`devicesContextDidChange(...)`, які викликає
   DeviceStore через слабко захоплені замикання (без власного `adb devices`).
-  `isOperationActive` тут — ЛИШЕ `transfer != nil` (push НЕ блокує лістинг/storageInfo).
+  `isOperationActive` тут — лише `transfer != nil` (push не блокує лістинг/storageInfo).
 - `TransferCoordinator` (не `OperationQueue` — конфлікт імені з `Foundation`) — черга
   copy/move/push, `destination`, історія операцій (`HistoryStore`).
 - `PreviewStore` — Quick Look, мініатюри (`ThumbnailCache`), кеші (`previewCacheRoot`,
@@ -106,8 +107,8 @@ retain-циклів: `[weak browser]`/`[weak transfers]` там, де схови
 ## Інваріанти (не ламати)
 
 - **Видалення лише після verify.** Move завжди: pull → перевірка розмірів/дат → лише
-  ТОДІ `rm` на телефоні. Ніколи не видаляти до підтвердженої копії.
-- **Cancel-ескалація.** SIGTERM → 3с очікування → SIGKILL, одноразово — ЄДИНЕ джерело
+  тоді `rm` на телефоні. Ніколи не видаляти до підтвердженої копії.
+- **Cancel-ескалація.** SIGTERM → 3с очікування → SIGKILL, одноразово — єдине джерело
   правди: `ChildProcess.terminateWithEscalation()` (лічильник під `NSLock`, не
   `LockedFlag`). Не дублювати `terminate() + asyncAfter(3с) { forceKill() }` окремо в
   жодному новому місці — завжди через `child.terminateWithEscalation()`, попри те, з
@@ -117,8 +118,8 @@ retain-циклів: `[weak browser]`/`[weak transfers]` там, де схови
   APFS-мок цього не покаже — він нормалізаційно-нечутливий).
 - **unicodeScalars для шляхів/квотингу**, ніколи grapheme-рівень (`Character`/`split`).
 - **Мок дзеркалить кожен shell-скрипт.** `scripts/mock_adb.py` — той самий if/elif-
-  диспетчер, у ТОМУ Ж ПОРЯДКУ гілок (підрядок однієї гілки може збігтися з іншою).
-- **Swift 6 strict в обох таргетах** (з 2.5): `@MainActor`-ізоляція сховищ,
+  диспетчер, у тому самому порядку гілок (підрядок однієї гілки може збігтися з іншою).
+- **Swift 6 strict в обох таргетах**: `@MainActor`-ізоляція сховищ,
   `nonisolated(unsafe)` + `@ObservationIgnored` лише для `Task`-хендлів, які deinit
   мусить скасувати синхронно поза MainActor.
 
@@ -147,7 +148,7 @@ retain-циклів: `[weak browser]`/`[weak transfers]` там, де схови
 `ChildProcess.terminateWithEscalation()` — SIGTERM поточному зареєстрованому
 adb-процесу, SIGKILL через 3с якщо не відреагував (idempotent — той самий шлях, яким
 ідуть idle-таймаут `ProcessRunner.run` і `onTermination` `ProcessRunner.stream`).
-`DeviceStore`/`BrowserStore` скасовують СВОЇ довгоживучі Task (track-devices стрім,
+`DeviceStore`/`BrowserStore` скасовують свої довгоживучі Task (track-devices стрім,
 поллер листингу) у власному `deinit`, коли вікно (і його `AppState`) звільняється —
 обидва Task захоплюють `self` слабо і зв'язують у сильний локальний лише на момент
 застосування одного кадру/тіку, ніколи на весь час очікування наступного.

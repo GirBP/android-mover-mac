@@ -2,8 +2,8 @@ import Foundation
 
 /// Поле сортування таблиці браузера — компактний, не-SwiftUI еквівалент
 /// `KeyPathComparator<RemoteEntry>.keyPath`. BrowserStore (Sources/AndroidMover/State/) сам
-/// мапить одне в інше; BrowserIndex і решта AndroidMoverCore НІКОЛИ не бачать
-/// KeyPathComparator/SwiftUI (той таргет без залежностей UI, лише Foundation).
+/// мапить одне в інше; BrowserIndex і решта AndroidMoverCore не бачать
+/// KeyPathComparator/SwiftUI — той таргет без залежностей UI, лише Foundation.
 public enum BrowserSortField: Sendable, Equatable {
     case name, size, modified
 }
@@ -19,17 +19,16 @@ extension BrowserIndex {
     }
 }
 
-/// Незмінний знімок "теки телефона, готової до показу": відсортовані+відфільтровані записи,
-/// побудовані РАЗ (`build`), а не при кожному читанні. Вирішує проблему
-/// `BrowserStore.sortedEntries`/`filteredEntries` (computed properties, що робили
-/// `entries.sorted(using:)` + 2-4 проходи `filter` на КОЖЕН доступ — ForEach таблиці, overlay,
-/// selectionSummary, canTransfer, AppCommands `.disabled` при кожній валідації меню, кожен
-/// `didSet filterText`).
+/// Незмінний знімок теки телефона, готової до показу: відсортовані й відфільтровані
+/// записи, побудовані раз (`build`), а не при кожному читанні. Уникає повторного
+/// `entries.sorted(using:)` + 2-4 проходів `filter` на кожен доступ — ForEach таблиці,
+/// overlay, selectionSummary, canTransfer, AppCommands `.disabled` при кожній валідації
+/// меню, кожен `didSet filterText`.
 ///
-/// `Sendable` — усі поля Sendable-значеннєві типи (`RemoteEntry` сам `Sendable`), тож `build()`
-/// можна кликати з БУДЬ-ЯКОГО потоку/актора, зокрема `Task.detached`.
+/// `Sendable` — усі поля Sendable-значеннєві типи (`RemoteEntry` сам `Sendable`), тож
+/// `build()` можна кликати з будь-якого потоку чи актора, зокрема `Task.detached`.
 public struct BrowserIndex: Sendable {
-    /// Усі entries у порядку сортування, БЕЗ фільтра — приватно: єдиний спосіб зробити
+    /// Усі entries у порядку сортування, без фільтра — приватно: єдиний спосіб зробити
     /// `refiltered(_:_:)` дешевим (без пересортування), не даючи зовнішньому коду плутати
     /// "усі відсортовані" з "видимі".
     private let sorted: [RemoteEntry]
@@ -55,7 +54,7 @@ public struct BrowserIndex: Sendable {
         self.byID = byID
     }
 
-    /// Дорога частина (сортування) — кличеться ЛИШЕ коли entries/sortOrder реально змінились.
+    /// Дорога частина (сортування) — кличеться лише коли entries/sortOrder реально змінились.
     /// Чиста функція, без побічних ефектів — безпечна для `Task.detached`
     /// (`BrowserStore.scheduleIndexRebuild`).
     public static func build(entries: [RemoteEntry], sortSpec: SortSpec, filterText: String, showHidden: Bool) -> BrowserIndex {
@@ -63,9 +62,9 @@ public struct BrowserIndex: Sendable {
         return filtering(sorted: sorted, filterText: filterText, showHidden: showHidden)
     }
 
-    /// Дешева перефільтрація (лінійний прохід, БЕЗ пересортування) — той самий `sorted`,
+    /// Дешева перефільтрація (лінійний прохід, без пересортування) — той самий `sorted`,
     /// новий filterText/showHidden. Синхронна, безпечна для виклику на MainActor при
-    /// кожній зміні filterText/showHidden (бенчмарк: <30мс навіть на 50k).
+    /// кожній зміні filterText/showHidden (<30 мс навіть на 50k).
     public func refiltered(filterText: String, showHidden: Bool) -> BrowserIndex {
         Self.filtering(sorted: sorted, filterText: filterText, showHidden: showHidden)
     }
@@ -77,7 +76,7 @@ public struct BrowserIndex: Sendable {
         visible.reserveCapacity(sorted.count)
         let query = filterText.isEmpty ? nil : filterText
         for entry in sorted {
-            if entry.name.hasPrefix(".androidmover-tmp-") { continue }   // ЗАВЖДИ, як і сьогодні
+            if entry.name.hasPrefix(".androidmover-tmp-") { continue }   // приховано завжди
             if !showHidden, entry.name.hasPrefix(".") { continue }
             if let query, !entry.matches(query: query) { continue }       // RemoteEntry.matches, Models.swift
             visible.append(entry)
@@ -87,34 +86,34 @@ public struct BrowserIndex: Sendable {
         return BrowserIndex(sorted: sorted, visibleEntries: visible, visibleIDs: ids, byID: map)
     }
 
-    /// Стабільний сорт (`Array.sorted(by:)` гарантовано стабільний з Swift 5) із "теки завжди
-    /// зверху" як первинним ключем — той самий результат, що старе
-    /// `entries.sorted(using: sortOrder)`, потім `.filter(\.isDirectory) + .filter { !$0.isDirectory }`
-    /// (filter зберігає відносний порядок, тож розбиття після повного сорту == сортування з
+    /// Стабільний сорт (`Array.sorted(by:)` гарантовано стабільний з Swift 5) із «теки завжди
+    /// зверху» як первинним ключем — еквівалентно `entries.sorted(using: sortOrder)`, потім
+    /// `.filter(\.isDirectory) + .filter { !$0.isDirectory }` (filter зберігає відносний
+    /// порядок, тож розбиття після повного сорту дає той самий результат, що сортування з
     /// isDirectory як первинним ключем).
     ///
-    /// Навмисне ПОКРАЩЕННЯ видимої поведінки для поля `.name`: натуральний (числовий) порядок
-    /// "IMG_2.jpg" < "IMG_10.jpg" замість лексикографічного String `<`, яким сортувало старе
-    /// KeyPathComparator(\.name) — той самий видимий ефект, що дає `localizedStandardCompare`,
-    /// але БЕЗ ICU-порівняння в гарячому компараторі (рахувалось би на кожне порівняння під
-    /// час sort — O(n log n) ICU-викликів; тут — один розбір ключа на елемент, порівняння
-    /// далі — плоский String `<`, naturalSortKey(_:) нижче).
+    /// Для поля `.name` — навмисно натуральний (числовий) порядок «IMG_2.jpg» <
+    /// «IMG_10.jpg» замість лексикографічного String `<`, який дав би простий
+    /// KeyPathComparator(\.name). Той самий видимий ефект, що й `localizedStandardCompare`,
+    /// але без ICU-порівняння в гарячому компараторі — це рахувалось би на кожне
+    /// порівняння під час sort (O(n log n) ICU-викликів); тут один розбір ключа на елемент,
+    /// порівняння далі — плоский String `<` (naturalSortKey(_:) нижче).
     ///
-    /// Аудит-фікс (severity: high): перша версія кодувала нецифрові символи СИРИМ Unicode
-    /// code point-ом — це ламало колацію для кирилиці й діакритики: українські Ґ/Є/І/Ї
-    /// (U+0490/0404/0406/0407) лежать поза основним кириличним блоком (U+0430-044F) і при
-    /// порівнянні "як є" стрибали в кінець замість своїх алфавітних місць (Ґудзик — в кінець
-    /// списку, Європа/Індія/Їжак — після всього а-я); латинські літери з діакритикою (à, é…)
-    /// так само не групувались із базовою літерою. Виправлено через `characterWeights` —
-    /// ICU-коректний ранг символу, обчислений РАЗ (лениво, на маленькому фіксованому
-    /// алфавіті), а не через ICU-порівняння на кожне з O(n log n) порівнянь під час сорту.
+    /// Нецифрові символи кодуються через `characterWeights` — ICU-коректний ранг символу,
+    /// обчислений раз (лениво, на маленькому фіксованому алфавіті), а не через ICU-порівняння
+    /// на кожне з O(n log n) порівнянь під час сорту. Кодування сирим Unicode code point-ом
+    /// ламає колацію для кирилиці й діакритики: українські Ґ/Є/І/Ї (U+0490/0404/0406/0407)
+    /// лежать поза основним кириличним блоком (U+0430-044F) і при порівнянні «як є» стрибають
+    /// у кінець замість своїх алфавітних місць (Ґудзик — у кінець списку, Європа/Індія/Їжак —
+    /// після всього а-я); латинські літери з діакритикою (à, é…) так само не групуються з
+    /// базовою літерою.
     ///
-    /// Сортує ІНДЕКСИ, не самі `RemoteEntry` — той має 2 String-поля (path/name), тож фізичні
+    /// Сортує індекси, не самі `RemoteEntry` — той має 2 String-поля (path/name), тож фізичні
     /// свопи повних структур під час `Array.sorted` (introsort свопає елементи на кожен крок
-    /// партиціонування) тягнуть ARC retain/release на КОЖЕН своп, а не лише на порівняння.
+    /// партиціонування) тягнуть ARC retain/release на кожен своп, а не лише на порівняння.
     /// Масив `Int` свопається без жодного ARC; фінальний permutation-гатер (`entries[$0]`)
-    /// копіює кожен елемент РІВНО ОДИН РАЗ. Вимірювано (M2): у DEBUG-збірці (`swift test`,
-    /// без оптимізацій) — у ~3× швидше, ніж decorate-sort-undecorate повних структур
+    /// копіює кожен елемент рівно один раз — у DEBUG-збірці (`swift test`, без оптимізацій)
+    /// приблизно втричі швидше, ніж decorate-sort-undecorate повних структур
     /// (BrowserIndexTests.testBuildPerformanceOn50kEntries).
     private static func sortedEntries(_ entries: [RemoteEntry], spec: SortSpec) -> [RemoteEntry] {
         guard entries.count > 1 else { return entries }
@@ -143,7 +142,7 @@ public struct BrowserIndex: Sendable {
         return order.map { entries[$0] }
     }
 
-    // MARK: - Природний ключ сортування імені (обчислюється РАЗ на елемент, не в компараторі)
+    // MARK: - Природний ключ сортування імені (обчислюється раз на елемент, не в компараторі)
 
     /// Ширина, до якої padить кожен цифровий забіг нулями зліва — 20 символів вкладає навіть
     /// `Int64.max` (19 цифр) із запасом; довші забіги (на практиці не трапляються в іменах
@@ -158,12 +157,12 @@ public struct BrowserIndex: Sendable {
     /// офсетом — до ~1 124 111, 7 цифр вистачає із запасом).
     private static let charWeightWidth = 7
 
-    /// ICU-коректний ранг символу для колації — обчислюється РАЗ (лениво, статично), а не
-    /// на кожне з O(n log n) порівнянь під час сорту: алфавіт тут МАЛЕНЬКИЙ (літери
+    /// ICU-коректний ранг символу для колації — обчислюється раз (лениво, статично), а не
+    /// на кожне з O(n log n) порівнянь під час сорту: алфавіт тут невеликий (літери
     /// латиниці+діакритики й української кирилиці, ~90 символів), тож один прохід
     /// `String.compare(locale:)` по ньому — на відміну від виклику ICU на кожне порівняння
     /// імен файлів (виміряно: ~260мс/RELEASE на 50k імен проти ~90-110мс тут) — практично
-    /// безкоштовний. Локаль ЯВНО "uk" (не `Locale.current`) — застосунок україномовний
+    /// безкоштовний. Локаль явно "uk" (не `Locale.current`) — застосунок україномовний
     /// (`defaultLocalization: "uk"`, Package.swift), і сортування не повинно залежати від
     /// системної локалі користувача Mac (яка може бути en-US і з українськими іменами
     /// файлів).

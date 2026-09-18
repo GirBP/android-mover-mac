@@ -5,9 +5,9 @@ public struct PushProgress: Sendable {
         case counting
         case pushing
         case verifying
-        /// v0.11.0 (P2): push чи verify провалились — чекаємо пристрій перед новою спробою.
+        /// Push чи verify провалились — чекаємо пристрій перед новою спробою.
         case waitingForDevice
-        /// v0.11.0 (P2): пристрій повернувся — допушуємо лише відсутні/биті файли у tmp.
+        /// Пристрій повернувся — допушуємо лише відсутні/биті файли у tmp.
         case resuming
         case finishing
     }
@@ -20,7 +20,7 @@ public struct PushProgress: Sendable {
     public var currentName: String = ""
     public var bytesTotal: Int64 = 0
     public var bytesDone: Int64 = 0
-    /// v0.11.0: номер спроби докачки (0 — штатна перша).
+    /// Номер спроби докачки (0 — штатна перша).
     public var attempt: Int = 0
 
     public var fraction: Double {
@@ -53,16 +53,15 @@ public struct PushItemResult: Identifiable, Sendable {
     }
 }
 
-/// Рушій перенесення Mac → Android (B1), дзеркало TransferEngine: рахує локально → пушить у
-/// тимчасову теку на телефоні → верифікує (кількість+розміри) ДО появи у видимому місці →
+/// Рушій перенесення Mac → Android, дзеркало TransferEngine: рахує локально → пушить у
+/// тимчасову теку на телефоні → верифікує (кількість+розміри) до появи у видимому місці →
 /// move у колізієвільне фінальне ім'я → best-effort звірка mtime → прибирає тимчасову теку.
 public final class PushEngine: @unchecked Sendable {
     let client: ADBClient
     let fileManager = FileManager.default
-    /// 2.2: спільний контролер скасування — раніше тут окремо жили cancelFlag/currentProcess/
-    /// trackProcess, дубльовані з TransferEngine (див. CancellableADBOperation.swift).
+    /// Спільний контролер скасування (див. CancellableADBOperation.swift).
     let cancellation = CancellationController()
-    /// v0.11.0 (P2): ті самі ліміти, що в TransferEngine — транспортні обриви до maxAttempts
+    /// Ті самі ліміти, що в TransferEngine — транспортні обриви до maxAttempts
     /// (15 × 120 с ≈ 30 хв), верифікаційні розбіжності — до 3.
     let maxAttempts: Int
     let retryDelay: @Sendable (Int) -> TimeInterval
@@ -119,7 +118,7 @@ public final class PushEngine: @unchecked Sendable {
         }
 
         // 1. Локальний підрахунок: рекурсивно файли+розміри (FileManager.enumerator).
-        //    Symlink на верхньому рівні — провал ЛИШЕ цього елемента (як isSymlink-перевірка
+        //    Symlink на верхньому рівні — провал лише цього елемента (як isSymlink-перевірка
         //    entry на pull-напрямку), решта елементів іде далі. Збій одного елемента не зриває батч.
         let (localMaps, itemBytes, precountFailures) = precountLocalItems(urls: urls, progress: &progress, onProgress: onProgress)
         if cancellation.isCancelled {
@@ -130,7 +129,7 @@ public final class PushEngine: @unchecked Sendable {
             }
         }
 
-        // v0.12.2 (M1, аудит M3): місце на телефоні — ДО першого push і до створення tmp.
+        // Місце на телефоні перевіряється до першого push і до створення tmp.
         // `storageInfo` недоступний (нема toybox) → продовжуємо; ENOSPC у stderr тоді ловить
         // класифікатор TransferEngine.isResumable (без 15 марних спроб).
         if precountFailures.count < urls.count, progress.bytesTotal > 0,
@@ -287,10 +286,10 @@ public final class PushEngine: @unchecked Sendable {
         if cancellation.isCancelled { throw ADBError.cancelled }
         let tmpItemPath = RemotePath.join(itemTmpDir, name)
 
-        // Перша спроба: push цілого елемента + верифікація. v0.11.0 (P2): провал (обрив
-        // кабеля, бита копія) → цикл докачки: чекаємо пристрій → допушуємо лише відсутні/биті
-        // файли у tmp → верифікуємо знову; до maxAttempts (верифікаційні — до 3). Видиме
-        // місце на телефоні не чіпається, доки tmp-копія не звірена.
+        // Перша спроба: push цілого елемента + верифікація. Провал (обрив кабеля, бита
+        // копія) веде в цикл докачки: чекаємо пристрій → допушуємо лише відсутні/биті файли у
+        // tmp → верифікуємо знову; до maxAttempts (верифікаційні — до 3). Видиме місце на
+        // телефоні не чіпається, доки tmp-копія не звірена.
         try await pushItemWithRetry(
             url: url, itemTmpDir: itemTmpDir, tmpItemPath: tmpItemPath, localMap: localMap,
             serial: serial, progress: &progress, onProgress: onProgress
@@ -308,7 +307,7 @@ public final class PushEngine: @unchecked Sendable {
             try await client.move(tmpItemPath, to: finalPath, on: serial)
         }
 
-        // Best-effort mtime-звірка (НЕ провал перенесення): sync-протокол push передає дати,
+        // Best-effort mtime-звірка (не провал перенесення): sync-протокол push передає дати,
         // але FUSE-поведінка неоднорідна по OEM — розбіжність >2с у >0 файлів стає warning.
         let warning = await mtimeWarning(localMap: localMap, localRoot: url, finalRemotePath: finalPath, serial: serial)
         return (finalPath, warning)
@@ -316,7 +315,7 @@ public final class PushEngine: @unchecked Sendable {
 
     // MARK: - Допоміжні
 
-    /// Колізієвільне ім'я НА ТЕЛЕФОНІ: async-аналог TransferEngine.collisionFreeURL — той
+    /// Колізієвільне ім'я на телефоні: async-аналог TransferEngine.collisionFreeURL — той
     /// самий генератор кандидатів (TransferEngine.collisionCandidateName), але існування
     /// перевіряється віддалено через remoteExists замість FileManager.
     static func remoteCollisionFreeName(for name: String, in destDir: String, client: ADBClient, serial: String) async throws -> String {
@@ -336,7 +335,7 @@ public final class PushEngine: @unchecked Sendable {
 
     /// Рекурсивний локальний підрахунок: відносний шлях (unicode-нормалізований) → розмір;
     /// "" — сам url, якщо це одиночний файл. Вкладені symlink-и тихо пропускаються (не
-    /// частина даних, що переносяться) — на відміну від symlink НА ВЕРХНЬОМУ рівні, який
+    /// частина даних, що переносяться) — на відміну від symlink на верхньому рівні, який
     /// провалює елемент цілком (перевіряється викликачем до цього виклику).
     static func localFileMap(at url: URL, fileManager: FileManager) throws -> (map: [String: Int64], bytes: Int64) {
         var isDirectory: ObjCBool = false

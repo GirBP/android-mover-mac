@@ -4,7 +4,7 @@ import XCTest
 
 extension EngineTests {
 
-    // MARK: - B2: resume/делта-докачка після обриву
+    // MARK: - Resume/делта-докачка після обриву
 
     func testResumeRefetchesOnlyMissingFilesAfterMidTransferFailure() async throws {
         if Self.backend == "real" { throw XCTSkip("mock-only") }
@@ -104,7 +104,7 @@ extension EngineTests {
             return
         }
 
-        // У призначенні НІЧОГО — ні готового елемента, ні tmp.
+        // У призначенні нічого нема — ні готового елемента, ні tmp.
         XCTAssertFalse(fm.fileExists(atPath: destination.appendingPathComponent("Фото відпустки").path))
         let leftovers = try fm.contentsOfDirectory(atPath: destination.path)
             .filter { $0.hasPrefix(".androidmover-tmp") }
@@ -138,7 +138,7 @@ extension EngineTests {
         XCTAssertEqual(try Data(contentsOf: copied.appendingPathComponent("відео кліп.mp4")),
                        Data(repeating: 0x42, count: 2048))
 
-        // Джерело видалене ЛИШЕ після того, як фінальна verify (по докачці) пройшла.
+        // Джерело видалене лише після того, як фінальна verify (по докачці) пройшла.
         let sourceGone = try await remoteFileExists("DCIM/Фото відпустки")
         XCTAssertFalse(sourceGone)
     }
@@ -184,11 +184,11 @@ extension EngineTests {
         XCTAssertEqual(leftovers, [])
     }
 
-    /// Регресія: докачка (resumeMissing) МУСИТЬ звертатись до телефона за СИРИМИ байтами
+    /// Регресія: докачка (resumeMissing) мусить звертатись до телефона за сирими байтами
     /// імені з лістингу, не unicode-нормалізованим ключем. "й" на телефоні лежить як NFD
     /// (U+0438 CYRILLIC SMALL LETTER I + U+0306 COMBINING BREVE) — телефон (ext4/FUSE) шукає
     /// ім'я байт-у-байт, тож pull за NFC-варіантом отримав би "не існує". "b.txt" навмисно
-    /// сортується ПЕРЕД NFD-файлом (код-пойнт 'b' 0x62 < код-пойнт 'и' 0x438), тож
+    /// сортується перед NFD-файлом (код-пойнт 'b' 0x62 < код-пойнт 'и' 0x438), тож
     /// MOCK_PULL_FAIL_COUNT=1 (частковий pull) лишає "b.txt" цілим, а NFD-файл — обрізаним
     /// навпіл: саме його resumeMissing і мусить докачати.
     func testResumePullsMissingFileByRawDeviceBytesNotNormalized() async throws {
@@ -226,7 +226,7 @@ extension EngineTests {
         XCTAssertEqual(pullPaths.count, 2,
                        "очікувались 2 pull-виклики (перший провал + докачка NFD-файла), отримано \(pullPaths)")
 
-        // Головний асерт: докачувальний pull мусить нести САМЕ NFD-байти, не NFC-нормалізовану
+        // Головний асерт: докачувальний pull мусить нести саме NFD-байти, не NFC-нормалізовану
         // версію. Swift String `==` порівнює канонічно-еквівалентно (NFC і NFD того самого
         // імені виглядають "рівними"!), тому звірка йде побайтово через utf8, а не через `==`.
         let expectedRemotePath = "\(remoteRoot!)/NFDTest/\(nfdName)"
@@ -235,7 +235,7 @@ extension EngineTests {
                        "докачувальний pull використав нормалізований шлях замість сирих байтів телефона")
     }
 
-    /// #2: цикл спроб докачки має стартувати ЛИШЕ для ADBError — будь-яка локальна помилка
+    /// #2: цикл спроб докачки має стартувати лише для ADBError — будь-яка локальна помилка
     /// (напр. CocoaError від FileManager.moveItem у finishAfterPull) кидається одразу.
     func testIsResumableDistinguishesADBErrorsFromLocalErrors() {
         XCTAssertTrue(TransferEngine.isResumable(ADBError.verificationFailed("mismatch")))

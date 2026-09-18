@@ -3,9 +3,9 @@ import Observation
 import Foundation
 import AndroidMoverCore
 
-/// 2.1: видалити/перейменувати/нова тека на телефоні — раніше жило в AppState. Тримає
-/// СИЛЬНІ (однонапрямні) посилання на DeviceStore/BrowserStore/TransferCoordinator
-/// (останнє — лише щоб дописувати в спільну історію операцій, A5).
+/// Видалити/перейменувати/нова тека на телефоні. Тримає сильні однонапрямні посилання на
+/// DeviceStore/BrowserStore/TransferCoordinator (останнє — лише щоб дописувати в спільну
+/// історію операцій).
 @MainActor
 @Observable
 final class FileActions {
@@ -27,12 +27,11 @@ final class FileActions {
         self.transfers = transfers
     }
 
-    /// Аудит-фікс (low): БУЛО `deleteTargetIDs.compactMap { index.byID[$0] }` — ітерація по
-    /// `Set<String>`, чий порядок НЕ прив'язаний до порядку в таблиці (hash-bucket, залежить
-    /// від рандомізації хешу String у процесі), тож історія/помилки видалення (deleteConfirmed
-    /// нижче) могли вийти в довільному порядку відносно того, що бачив і обирав користувач.
-    /// Тепер — фільтр `index.visibleEntries` (той самий патерн, що вже свідомо застосований у
-    /// `BrowserStore.selectedEntries` саме з цієї причини) — O(|visibleEntries|) замість
+    /// Фільтр `index.visibleEntries` (той самий патерн, що в `BrowserStore.selectedEntries`),
+    /// не `deleteTargetIDs.compactMap { index.byID[$0] }` — ітерація по `Set<String>` не
+    /// прив'язана до порядку в таблиці (hash-bucket, залежить від рандомізації хешу String у
+    /// процесі), тож історія/помилки видалення (deleteConfirmed нижче) вийшли б у довільному
+    /// порядку відносно того, що бачив і обирав користувач. O(|visibleEntries|) замість
     /// O(|deleteTargetIDs|), але видалення — не гарячий шлях (виклик на дію користувача, не на
     /// кожен ре-рендер), і на відміну від `Set.compactMap` зберігає порядок таким, яким його
     /// бачить користувач у таблиці.
@@ -41,12 +40,11 @@ final class FileActions {
         return browserStore.index.visibleEntries.filter { deleteTargetIDs.contains($0.id) }
     }
 
-    /// Аудит-фікс (п.4): валідація проти видимого, не проти `entries` (усе) — єдина точка
-    /// входу для видалення (контекстне меню Table і ⌘⌫ у AppCommands обидва йдуть сюди), тож
-    /// досить виправити тут, щоб жоден шлях не міг підсунути прихований тумблером/фільтром id
-    /// у підтвердження видалення.
-    /// v0.10.1: `index.visibleIDs` — уже готовий Set, без перебудови (`Set(filteredEntries.map)`
-    /// раніше тягнув повний sort+filter на КОЖЕН виклик, навіть для видалення одного файла).
+    /// Валідація проти видимого, не проти `entries` (усе) — єдина точка входу для видалення
+    /// (контекстне меню Table і ⌘⌫ у AppCommands обидва йдуть сюди), тож досить перевірити
+    /// тут, щоб жоден шлях не міг підсунути прихований тумблером/фільтром id у підтвердження
+    /// видалення. `index.visibleIDs` — уже готовий Set, без перебудови на кожен виклик, навіть
+    /// для видалення одного файла.
     func requestDelete(_ ids: Set<String>) {
         let valid = ids.filter { browserStore.index.visibleIDs.contains($0) }
         guard !valid.isEmpty else { return }
@@ -86,7 +84,7 @@ final class FileActions {
             if !errors.isEmpty { actionError = errors.joined(separator: "\n") }
             transfers.appendHistory(direction: "delete", items: historyItems)
             await browserStore.refreshList()
-            // Best-effort, fire-and-forget: ніколи не блокує і не провалює саме видалення (A6).
+            // Best-effort, fire-and-forget: ніколи не блокує і не провалює саме видалення.
             if deletedAny {
                 Task {
                     try? await client.rescanMedia(deletedMediaPaths, on: serial)
@@ -127,7 +125,7 @@ final class FileActions {
         guard !name.isEmpty, !name.contains("/"), let client = deviceStore.client,
               let serial = deviceStore.activeDevice?.serial
         else {
-            // v0.10.2: порожнє/пробільне ім'я теж пояснюється, а не мовчки відкидається.
+            // Порожнє/пробільне ім'я теж пояснюється, а не мовчки відкидається.
             actionError = name.isEmpty
                 ? String(localized: "Введіть ім'я теки.")
                 : String(localized: "Недопустиме ім'я теки.")

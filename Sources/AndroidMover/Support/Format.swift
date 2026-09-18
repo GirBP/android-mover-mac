@@ -1,7 +1,7 @@
 import Foundation
 import AndroidMoverCore
 
-/// 2.5 (Swift 6 strict): формат-кеші (ByteCountFormatter/DateFormatter) не Sendable — усі
+/// Формат-кеші (ByteCountFormatter/DateFormatter) не Sendable (Swift 6 strict) — усі
 /// виклики й так ідуть з MainActor-ізольованих View, тому саме сховище ізолюємо явно.
 @MainActor
 enum Format {
@@ -17,7 +17,7 @@ enum Format {
         return f
     }()
 
-    /// v0.10.4: залишок часу людською мовою: «45 с», «2 хв», «1 год 05 хв».
+    /// Залишок часу людською мовою: «45 с», «2 хв», «1 год 05 хв».
     static func duration(_ seconds: TimeInterval) -> String {
         let total = Int(seconds.rounded())
         if total < 60 { return String(localized: "\(total) с") }
