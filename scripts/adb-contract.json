@@ -1,0 +1,145 @@
+{
+  "argvCommands" : [
+    "devices -l",
+    "track-devices",
+    "-s <serial> shell <script>",
+    "-s <serial> exec-out toybox head -c <bytes> <quoted path>",
+    "-s <serial> pull -a <remote>… <localDir>",
+    "-s <serial> push <local> <remote>",
+    "-s <serial> wait-for-device",
+    "mdns check",
+    "mdns services",
+    "pair <host:port> <code>",
+    "connect <host:port>",
+    "disconnect <host:port>"
+  ],
+  "marker" : "AM_OP=",
+  "scripts" : [
+    {
+      "opcode" : "listDir",
+      "sample" : "AM_OP=listDir; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; command -v toybox >/dev/null 2>&1 || { echo __AM_NO_TOYBOX__; exit 0; }; AM_R=$(toybox readlink -f \"$AM_P\" 2>/dev/null); [ -n \"$AM_R\" ] && AM_P=\"$AM_R\"; if [ ! -d \"$AM_P\" ]; then echo __AM_NOT_A_DIR__; exit 0; fi; toybox find \"$AM_P\" -mindepth 1 -maxdepth 1 -exec toybox stat -c '%F|%s|%Y|%n' {} + 2>/dev/null; exit 0",
+      "sentinels" : [
+        "__AM_NOT_A_DIR__",
+        "__AM_NO_TOYBOX__"
+      ]
+    },
+    {
+      "opcode" : "findFiles",
+      "sample" : "AM_OP=findFiles; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; if [ ! -e \"$AM_P\" ]; then echo __AM_MISSING__; exit 0; fi; toybox find \"$AM_P\" -type f -exec toybox stat -c '%s|%n' {} + 2>/dev/null; exit 0",
+      "sentinels" : [
+        "__AM_MISSING__"
+      ]
+    },
+    {
+      "opcode" : "findDirs",
+      "sample" : "AM_OP=findDirs; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; if [ ! -e \"$AM_P\" ]; then echo __AM_MISSING__; exit 0; fi; toybox find \"$AM_P\" -type d -exec toybox stat -c '%Y|%n' {} + 2>/dev/null; exit 0",
+      "sentinels" : [
+        "__AM_MISSING__"
+      ]
+    },
+    {
+      "opcode" : "statMTimes",
+      "sample" : "AM_OP=statMTimes; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; if [ ! -e \"$AM_P\" ]; then echo __AM_MISSING__; exit 0; fi; toybox find \"$AM_P\" -exec toybox stat -c '%Y|%n' {} + 2>/dev/null; exit 0",
+      "sentinels" : [
+        "__AM_MISSING__"
+      ]
+    },
+    {
+      "opcode" : "statFS",
+      "sample" : "AM_OP=statFS; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; command -v toybox >/dev/null 2>&1 || { echo __AM_NO_TOYBOX__; exit 0; }; toybox stat -f -c '%a|%b|%S' \"$AM_P\" 2>/dev/null || echo __AM_STAT_FAILED__; exit 0",
+      "sentinels" : [
+        "__AM_NO_TOYBOX__",
+        "__AM_STAT_FAILED__"
+      ]
+    },
+    {
+      "opcode" : "md5One",
+      "sample" : "AM_OP=md5One; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; if [ ! -e \"$AM_P\" ]; then echo __AM_MISSING__; exit 0; fi; if [ -d \"$AM_P\" ]; then toybox find \"$AM_P\" -type f -exec toybox md5sum {} + 2>/dev/null; else toybox md5sum \"$AM_P\" 2>/dev/null; fi; exit 0",
+      "sentinels" : [
+        "__AM_MISSING__"
+      ]
+    },
+    {
+      "opcode" : "md5Batch",
+      "sample" : "AM_OP=md5Batch; for AM_P in '/sdcard/a b.jpg' '/sdcard/o'\\''clock.mp4'; do toybox md5sum \"$AM_P\" 2>/dev/null; done; exit 0",
+      "sentinels" : [
+
+      ]
+    },
+    {
+      "opcode" : "rmOne",
+      "sample" : "AM_OP=rmOne; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; rm -rf -- \"$AM_P\" 2>/dev/null; if [ -e \"$AM_P\" ]; then echo __AM_DELETE_FAILED__; fi; exit 0",
+      "sentinels" : [
+        "__AM_DELETE_FAILED__"
+      ]
+    },
+    {
+      "opcode" : "rmBatch",
+      "sample" : "AM_OP=rmBatch; for AM_P in '/sdcard/a b.jpg' '/sdcard/o'\\''clock.mp4'; do rm -rf -- \"$AM_P\" 2>/dev/null; if [ -e \"$AM_P\" ]; then printf '__AM_DELETE_FAILED__|%s\\n' \"$AM_P\"; fi; done; exit 0",
+      "sentinels" : [
+        "__AM_DELETE_FAILED__"
+      ]
+    },
+    {
+      "opcode" : "rmdirBatch",
+      "sample" : "AM_OP=rmdirBatch; for AM_P in '/sdcard/a b.jpg' '/sdcard/o'\\''clock.mp4'; do toybox rmdir -- \"$AM_P\" 2>/dev/null; if [ -d \"$AM_P\" ]; then printf '__AM_NOT_EMPTY__|%s\\n' \"$AM_P\"; fi; done; exit 0",
+      "sentinels" : [
+        "__AM_NOT_EMPTY__"
+      ]
+    },
+    {
+      "opcode" : "mkdir",
+      "sample" : "AM_OP=mkdir; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; mkdir -- \"$AM_P\" 2>/dev/null; if [ ! -d \"$AM_P\" ]; then echo __AM_MKDIR_FAILED__; fi; exit 0",
+      "sentinels" : [
+        "__AM_MKDIR_FAILED__"
+      ]
+    },
+    {
+      "opcode" : "mkdirP",
+      "sample" : "AM_OP=mkdirP; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; mkdir -p -- \"$AM_P\" 2>/dev/null; if [ ! -d \"$AM_P\" ]; then echo __AM_MKDIR_FAILED__; fi; exit 0",
+      "sentinels" : [
+        "__AM_MKDIR_FAILED__"
+      ]
+    },
+    {
+      "opcode" : "moveOrFail",
+      "sample" : "AM_OP=moveOrFail; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; AM_Q='/sdcard/Приклад тека/новий (1).txt'; if [ -e \"$AM_Q\" ]; then echo __AM_EXISTS__; exit 0; fi; mv -- \"$AM_P\" \"$AM_Q\" 2>/dev/null; if [ ! -e \"$AM_Q\" ]; then echo __AM_MV_FAILED__; fi; exit 0",
+      "sentinels" : [
+        "__AM_EXISTS__",
+        "__AM_MV_FAILED__"
+      ]
+    },
+    {
+      "opcode" : "existsProbe",
+      "sample" : "AM_OP=existsProbe; AM_P='/sdcard/Приклад тека/it'\\''s файл й.txt'; if [ -e \"$AM_P\" ]; then echo __AM_EXISTS__; else echo __AM_ABSENT__; fi; exit 0",
+      "sentinels" : [
+        "__AM_ABSENT__",
+        "__AM_EXISTS__"
+      ]
+    },
+    {
+      "opcode" : "rescanPaths",
+      "sample" : "AM_OP=rescanPaths; AM_F='/sdcard/a b.jpg'; am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d \"file://$AM_F\" >/dev/null 2>&1; AM_F='/sdcard/o'\\''clock.mp4'; am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d \"file://$AM_F\" >/dev/null 2>&1; echo __AM_SCAN_DONE__; exit 0",
+      "sentinels" : [
+        "__AM_SCAN_DONE__"
+      ]
+    },
+    {
+      "opcode" : "rescanVolume",
+      "sample" : "AM_OP=rescanVolume; content call --uri content://media/external/file --method scan_volume --arg external_primary >/dev/null 2>&1; echo __AM_SCAN_DONE__; exit 0",
+      "sentinels" : [
+        "__AM_SCAN_DONE__"
+      ]
+    },
+    {
+      "opcode" : "getProps",
+      "sample" : "AM_OP=getProps; printf '__AM_ID__|%s\\n' \"$(settings get secure android_id 2>/dev/null)\"; printf '__AM_SN__|%s\\n' \"$(getprop ro.serialno 2>/dev/null)\"; printf '__AM_MODEL__|%s\\n' \"$(getprop ro.product.model 2>/dev/null)\"; exit 0",
+      "sentinels" : [
+        "__AM_ID__",
+        "__AM_MODEL__",
+        "__AM_SN__"
+      ]
+    }
+  ],
+  "version" : 1
+}

@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Cache .build
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: ${{ runner.os }}-swiftpm-${{ hashFiles('Package.swift', 'Sources/**') }}
+          restore-keys: |
+            ${{ runner.os }}-swiftpm-
+
+      - name: swift build
+        run: swift build
+
+      - name: swift test
+        run: swift test
+
+      - name: Build .app
+        run: scripts/build_app.sh
+
+      - name: Smoke test — запуск бінарника
+        run: |
+          "dist/Android Mover.app/Contents/MacOS/AndroidMover" &
+          APP_PID=$!
+          sleep 2.5
+          if ! kill -0 "$APP_PID" 2>/dev/null; then
+            echo "AndroidMover не пережив 2.5 с — вважаємо це провалом smoke-тесту."
+            exit 1
+          fi
+          kill "$APP_PID"

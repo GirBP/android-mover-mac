@@ -1,0 +1,10 @@
+.build/
+.swiftpm/
+DerivedData/
+dist/
+*.app
+.DS_Store
+*.xcuserstate
+.env
+__pycache__/
+*.pyc
